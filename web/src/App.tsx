@@ -1,17 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, AuthRequiredError } from "./api";
 import type { CalendarSummary, EventIn, EventOut, Me } from "./types";
 import { Header } from "./components/Header";
 import { EventsView } from "./components/EventsView";
 import { EventForm } from "./components/EventForm";
 import { RsvpsView } from "./components/RsvpsView";
-import { CalendarView } from "./components/CalendarView";
+import { CalendarView, type CalendarMode } from "./components/CalendarView";
 import { LoginView } from "./components/LoginView";
 import { VerifyView } from "./components/VerifyView";
 import { OnboardingView } from "./components/OnboardingView";
 import { UnofficialNote } from "./components/UnofficialNote";
 import { ToastStack, type ToastMsg } from "./components/Toast";
-import { fmtTimeShort } from "./util";
+import { addDays, buildMonthGrid, fmtTimeShort, startOfDay, startOfWeek } from "./util";
 import { useReminders } from "./useReminders";
 
 type Tab = "calendar" | "events" | "rsvps";
@@ -127,7 +127,26 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
   }, []);
 
   const [tab, setTab] = useState<Tab>("calendar");
+  const [calMode, setCalMode] = useState<CalendarMode>("month");
+  const [calAnchor, setCalAnchor] = useState<Date>(() => startOfDay(new Date()));
   const [form, setForm] = useState<FormState>({ open: false });
+
+  // Compute the CalDAV fetch range from the active tab + view state, so the
+  // server only returns events that are actually visible. Calendar tab uses
+  // the visible grid range; Events tab uses the `now → now+days` window.
+  const fetchRange = useMemo<{ from: Date; to: Date } | undefined>(() => {
+    if (tab !== "calendar") return undefined;
+    if (calMode === "month") {
+      const grid = buildMonthGrid(calAnchor);
+      return { from: grid[0], to: addDays(grid[grid.length - 1], 1) };
+    }
+    if (calMode === "week") {
+      const start = startOfWeek(calAnchor);
+      return { from: start, to: addDays(start, 7) };
+    }
+    const day = startOfDay(calAnchor);
+    return { from: day, to: addDays(day, 1) };
+  }, [tab, calMode, calAnchor]);
 
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const toastIdRef = useRef(1);
@@ -188,7 +207,7 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
     setEventsLoading(true);
     setEventsError(null);
     try {
-      const list = await handle(() => api.events(calendar || undefined, days));
+      const list = await handle(() => api.events(calendar || undefined, days, fetchRange));
       if (list) {
         const seenUids = new Set(list.map((e) => e.uid));
         // Server confirmed any pending UIDs that appear; drop them from pending.
@@ -210,7 +229,7 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
     } finally {
       setEventsLoading(false);
     }
-  }, [calendar, days, handle]);
+  }, [calendar, days, fetchRange, handle]);
 
   useEffect(() => {
     (async () => {
@@ -393,6 +412,7 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
       />
 
       <div className="mx-auto max-w-6xl px-4">
+        <QuietLoader active={eventsLoading} />
         <nav className="mt-4 flex gap-1 border-b border-ink-200">
           <TabButton active={tab === "calendar"} onClick={() => setTab("calendar")}>Calendar</TabButton>
           <TabButton active={tab === "events"} onClick={() => setTab("events")}>Events</TabButton>
@@ -409,6 +429,10 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
               onCreateAt={onCreateAt}
               onEdit={onEditClick}
               onMove={onMoveEvent}
+              mode={calMode}
+              setMode={setCalMode}
+              anchor={calAnchor}
+              setAnchor={setCalAnchor}
             />
           )}
           {tab === "events" && (
@@ -528,6 +552,16 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
           })()}
         </div>
       )}
+    </div>
+  );
+}
+
+function QuietLoader({ active }: { active: boolean }) {
+  return (
+    <div className="mt-2 h-[2px] w-full overflow-hidden rounded-full bg-ink-100" aria-hidden="true">
+      <div
+        className={`h-full w-1/3 rounded-full bg-accent-500 ${active ? "animate-loader-slide" : "opacity-0"}`}
+      />
     </div>
   );
 }

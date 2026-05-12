@@ -215,12 +215,21 @@ def list_calendars(creds: MailboxCreds) -> List[str]:
     return _with_retry(_do)
 
 
-def list_events(creds: MailboxCreds, calendar_name: Optional[str], days: int) -> List[EventOut]:
+def list_events(
+    creds: MailboxCreds,
+    calendar_name: Optional[str],
+    days: int,
+    start_override: Optional[datetime] = None,
+    end_override: Optional[datetime] = None,
+) -> List[EventOut]:
     def _do_search():
         client = cdav.connect(creds.caldav_url, creds.email, creds.password)
         calendar = cdav.get_calendar(client, calendar_name)
-        start = datetime.now(timezone.utc)
-        end = start + timedelta(days=days)
+        if start_override is not None and end_override is not None:
+            start, end = start_override, end_override
+        else:
+            start = datetime.now(timezone.utc)
+            end = start + timedelta(days=days)
         return list(calendar.search(start=start, end=end, event=True, expand=False))
     search_results = _with_retry(_do_search)
     out: List[EventOut] = []

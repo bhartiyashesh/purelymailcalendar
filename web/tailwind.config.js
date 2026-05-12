@@ -42,6 +42,15 @@ export default {
           900: "#4c1d95",
         },
       },
+      keyframes: {
+        "loader-slide": {
+          "0%":   { transform: "translateX(-110%)" },
+          "100%": { transform: "translateX(330%)" },
+        },
+      },
+      animation: {
+        "loader-slide": "loader-slide 1.1s ease-in-out infinite",
+      },
     },
   },
   plugins: [],

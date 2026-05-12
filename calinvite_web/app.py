@@ -73,11 +73,33 @@ def get_calendars(user: User = Depends(current_user)):
 def get_events(
     days: int = Query(60, ge=1, le=365),
     calendar: Optional[str] = None,
+    start: Optional[str] = Query(None, description="ISO-8601 start of fetch window. If set with `end`, overrides `days`."),
+    end: Optional[str] = Query(None, description="ISO-8601 end of fetch window. If set with `start`, overrides `days`."),
     user: User = Depends(current_user),
 ):
+    from datetime import datetime, timezone
+
     creds = _creds(user)
+    start_override = None
+    end_override = None
+    if start and end:
+        try:
+            sd = datetime.fromisoformat(start.replace("Z", "+00:00"))
+            ed = datetime.fromisoformat(end.replace("Z", "+00:00"))
+            if sd.tzinfo is None:
+                sd = sd.replace(tzinfo=timezone.utc)
+            if ed.tzinfo is None:
+                ed = ed.replace(tzinfo=timezone.utc)
+            if ed <= sd:
+                raise HTTPException(status_code=400, detail="`end` must be after `start`")
+            start_override = sd
+            end_override = ed
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"invalid start/end: {e}")
     try:
-        return services.list_events(creds, calendar, days)
+        return services.list_events(creds, calendar, days, start_override, end_override)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"CalDAV error: {e}")
 
