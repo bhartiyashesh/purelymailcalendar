@@ -69,7 +69,10 @@ export function LoginView() {
         ) : (
           <form onSubmit={submit}>
             <h2 className="mb-1 text-lg font-semibold text-ink-900">Sign in</h2>
-            <p className="mb-4 text-sm text-ink-600">
+            <p className="text-xs font-medium uppercase tracking-wide text-accent-700">
+              Works with mailboxes hosted with Purelymail.
+            </p>
+            <p className="mb-4 mt-1 text-sm text-ink-600">
               Enter your email. We'll send a one-time sign-in link.
             </p>
             <label className="label">Email</label>
