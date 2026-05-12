@@ -29,7 +29,10 @@ from .schemas import (
 
 app = FastAPI(title="calinvite web", version="0.2.0")
 
-_dev_origins = os.getenv("CALINVITE_WEB_CORS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+# `null` is the Origin a browser sends for file:// pages (used by the
+# off-repo admin dashboard HTML). Safe to allow because the admin
+# endpoint is gated on a bearer token, not a cookie.
+_dev_origins = os.getenv("CALINVITE_WEB_CORS", "http://localhost:5173,http://127.0.0.1:5173,null").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in _dev_origins if o.strip()],
@@ -68,6 +71,8 @@ def _startup() -> None:
 app.include_router(auth_router)
 app.include_router(mailbox_router)
 app.include_router(reminders_router)
+from .admin import router as admin_router  # noqa: E402  (intentional late import)
+app.include_router(admin_router)
 
 
 def _creds(user: User) -> services.MailboxCreds:
