@@ -1,0 +1,17 @@
+{
+  "name": "Purelymail Calendar",
+  "short_name": "PMC",
+  "description": "Calendar and invite app for Purelymail mailboxes. Unofficial, community-built.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "type": "image/png",
+      "sizes": "any",
+      "purpose": "any"
+    }
+  ]
+}

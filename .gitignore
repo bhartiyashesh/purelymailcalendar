@@ -1,0 +1,120 @@
+# ---------- Secrets and local state ----------
+# Never commit these. .env contains live mailbox passwords, API keys, etc.
+.env
+.env.*
+!.env.example
+*.bak
+*.bak2
+*.bak3
+.fernet.key
+*.pem
+*.key
+
+# Local SQLite DBs (only used in dev; Postgres is used in prod)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg
+*.egg-info/
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual envs
+.venv/
+venv/
+ENV/
+env/
+.python-version
+
+# Test / type caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Alembic version cache (if/when added)
+# alembic/versions/__pycache__/
+
+# ---------- Node / frontend ----------
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs (we rebuild on deploy)
+web/dist/
+web/.vite/
+web/.turbo/
+
+# Lockfile lockdowns (keep package-lock.json; ignore others)
+yarn.lock
+pnpm-lock.yaml
+.yarn/
+.pnp.cjs
+.pnp.loader.mjs
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# ---------- Editor / OS ----------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.history/
+
+# ---------- Project-specific ----------
+# Original upstream archive (already extracted)
+calinvite.tar.gz
+
+# Planning / scratch notes
+.planning/
+
+# Claude / Cursor / Copilot agent state
+.claude/
+.cursor/
+.github/copilot/
+
+# Local context docs — keep these out of git so they don't leak ideas-in-flight
+# (Remove this line if you want CONTEXT.md tracked.)
+CONTEXT.md

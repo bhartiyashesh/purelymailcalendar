@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#7c3aed" />
+    <meta name="robots" content="index, follow" />
+    <meta name="author" content="Yashesh Bharti" />
+
+    <title>Purelymail Calendar — Calendar + invites for Purelymail mailboxes</title>
+    <meta
+      name="description"
+      content="Purelymail Calendar is a calendar and meeting-invite app for Purelymail users. Create events, send iTIP invites, track RSVPs, and manage your Purelymail calendar from one clean interface. Unofficial, community-built tool by Yashesh Bharti."
+    />
+    <meta
+      name="keywords"
+      content="Purelymail, Purelymail calendar, CalDAV, calendar invites, meeting invites, iTIP, RSVP, Purelymail webdav, Purelymail SMTP, custom domain email calendar"
+    />
+
+    <link rel="canonical" href="https://purelymailcalendar.com/" />
+
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Purelymail Calendar" />
+    <meta property="og:title" content="Purelymail Calendar" />
+    <meta
+      property="og:description"
+      content="Calendar and invite app for Purelymail mailboxes. Create events, send iTIP invites, track RSVPs. Unofficial, community-built."
+    />
+    <meta property="og:url" content="https://purelymailcalendar.com/" />
+    <meta property="og:image" content="https://purelymailcalendar.com/logo.png" />
+    <meta property="og:image:width" content="1254" />
+    <meta property="og:image:height" content="1254" />
+    <meta property="og:image:alt" content="Purelymail Calendar logo" />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Purelymail Calendar" />
+    <meta
+      name="twitter:description"
+      content="Calendar and invite app for Purelymail mailboxes. Unofficial, built by Yashesh Bharti."
+    />
+    <meta name="twitter:image" content="https://purelymailcalendar.com/logo.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Purelymail Calendar",
+        "url": "https://purelymailcalendar.com/",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "description": "Calendar and meeting-invite app for Purelymail mailboxes. Create events, send iTIP invites, track RSVPs. Unofficial, community-built tool.",
+        "author": {
+          "@type": "Person",
+          "name": "Yashesh Bharti"
+        },
+        "isAccessibleForFree": true,
+        "image": "https://purelymailcalendar.com/logo.png"
+      }
+    </script>
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-06E18161QX"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-06E18161QX');
+    </script>
+  </head>
+  <body class="bg-accent-50">
+    <div id="root"></div>
+    <noscript>
+      <div style="padding:24px;font-family:system-ui,sans-serif;max-width:480px;margin:48px auto;color:#0f172a">
+        <h1 style="font-size:18px;font-weight:600;margin:0 0 8px">Purelymail Calendar</h1>
+        <p style="font-size:14px;color:#475569;margin:0 0 12px">
+          This app needs JavaScript to run. Please enable JavaScript and refresh the page.
+        </p>
+        <p style="font-size:12px;color:#94a3b8;margin:0">
+          Unofficial, community-built tool. Not affiliated with Purelymail. Made by Yashesh Bharti.
+        </p>
+      </div>
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

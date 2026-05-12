@@ -1,0 +1,37 @@
+# VCS / editor
+.git/
+.gitignore
+.DS_Store
+*.swp
+
+# Local env / secrets / state
+.env
+.env.*
+*.bak
+*.bak2
+*.bak3
+.fernet.key
+calinvite.db
+calinvite.db-*
+*.sqlite
+*.sqlite-*
+
+# Python build artifacts
+.venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+build/
+dist/
+*.egg-info/
+
+# Node build artifacts (frontend is rebuilt in the web-build stage)
+web/node_modules/
+web/dist/
+
+# Tar archive shipped with the project (already extracted)
+calinvite.tar.gz
+
+# Local planning notes / scratch
+.planning/
+CONTEXT.md
