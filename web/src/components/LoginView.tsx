@@ -2,8 +2,27 @@ import { useState } from "react";
 import { api } from "../api";
 import { UnofficialNote } from "./UnofficialNote";
 
+const STORED_EMAIL_KEY = "pmc.lastSignInEmail";
+
+function readStoredEmail(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return localStorage.getItem(STORED_EMAIL_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function writeStoredEmail(value: string): void {
+  try {
+    if (value) localStorage.setItem(STORED_EMAIL_KEY, value);
+  } catch {
+    // localStorage can throw in private windows; non-fatal.
+  }
+}
+
 export function LoginView() {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState<string>(() => readStoredEmail());
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -12,8 +31,10 @@ export function LoginView() {
     e.preventDefault();
     setErr(null);
     setBusy(true);
+    const normalized = email.trim().toLowerCase();
     try {
-      await api.requestLink(email.trim().toLowerCase());
+      await api.requestLink(normalized);
+      writeStoredEmail(normalized);
       setSent(true);
     } catch (e: any) {
       setErr(e?.message || "request failed");
