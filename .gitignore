@@ -78,6 +78,13 @@ web/dist/
 web/.vite/
 web/.turbo/
 
+# tsc artifacts that shouldn't be committed
+*.tsbuildinfo
+web/vite.config.js
+web/vite.config.d.ts
+**/*.d.ts.map
+**/*.js.map
+
 # Lockfile lockdowns (keep package-lock.json; ignore others)
 yarn.lock
 pnpm-lock.yaml
