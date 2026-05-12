@@ -219,13 +219,19 @@ def sync_invites_endpoint(
     """
     creds = _creds(user)
     body = body or {}
+    raw_since = body.get("since_days", 30)
+    try:
+        since_days = int(raw_since) if raw_since is not None else None
+    except (TypeError, ValueError):
+        since_days = 30
     try:
         return services.sync_invites(
             creds,
             body.get("calendar"),
             mailbox=body.get("mailbox") or "INBOX",
-            only_unseen=bool(body.get("only_unseen", True)),
-            mark_seen=bool(body.get("mark_seen", True)),
+            only_unseen=bool(body.get("only_unseen", False)),
+            mark_seen=bool(body.get("mark_seen", False)),
+            since_days=since_days,
         )
     except (RuntimeError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))

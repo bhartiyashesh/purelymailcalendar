@@ -19,6 +19,7 @@ import email
 import imaplib
 import ssl
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Iterator, List, Optional
 
 from icalendar import Calendar as ICalendar
@@ -74,6 +75,7 @@ def sync_inbox_invites(
     mailbox: str = "INBOX",
     only_unseen: bool = True,
     mark_seen: bool = True,
+    since_days: Optional[int] = None,
     limit: int = 200,
 ) -> List[InviteResult]:
     results: List[InviteResult] = []
@@ -82,7 +84,13 @@ def sync_inbox_invites(
         typ, _ = m.select(mailbox)
         if typ != "OK":
             raise RuntimeError(f"cannot select mailbox '{mailbox}'")
-        criteria = "UNSEEN" if only_unseen else "ALL"
+        parts: List[str] = []
+        if only_unseen:
+            parts.append("UNSEEN")
+        if since_days is not None and since_days > 0:
+            since_dt = datetime.utcnow() - timedelta(days=since_days)
+            parts.append(f'SINCE {since_dt.strftime("%d-%b-%Y")}')
+        criteria = " ".join(parts) or "ALL"
         typ, data = m.search(None, criteria)
         if typ != "OK":
             return results

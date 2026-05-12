@@ -104,7 +104,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  syncInvites: (body?: { calendar?: string; mailbox?: string; only_unseen?: boolean; mark_seen?: boolean }) =>
+  syncInvites: (body?: { calendar?: string; mailbox?: string; only_unseen?: boolean; mark_seen?: boolean; since_days?: number | null }) =>
     request<{
       mailbox: string;
       counts: { created: number; updated: number; cancelled: number; skipped: number; error: number };

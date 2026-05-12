@@ -733,11 +733,17 @@ def sync_invites(
     calendar_name: Optional[str],
     *,
     mailbox: str = "INBOX",
-    only_unseen: bool = True,
-    mark_seen: bool = True,
+    only_unseen: bool = False,
+    mark_seen: bool = False,
+    since_days: Optional[int] = 30,
 ) -> dict:
     """Pull METHOD:REQUEST / METHOD:CANCEL .ics attachments from IMAP and
-    apply them to the user's CalDAV calendar."""
+    apply them to the user's CalDAV calendar.
+
+    Defaults scan the last 30 days regardless of read state — UID + SEQUENCE
+    dedup handles repeats, so re-running is a no-op for already-imported
+    events. only_unseen=True is still available for callers that want it.
+    """
 
     def _do_caldav():
         client = cdav.connect(creds.caldav_url, creds.email, creds.password)
@@ -753,6 +759,7 @@ def sync_invites(
         mailbox=mailbox,
         only_unseen=only_unseen,
         mark_seen=mark_seen,
+        since_days=since_days,
     )
     counts = {"created": 0, "updated": 0, "cancelled": 0, "skipped": 0, "error": 0}
     items = []
