@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { EventOut } from "../types";
 import {
   addDays,
@@ -12,7 +11,7 @@ import {
 import { MonthView } from "./MonthView";
 import { WeekView } from "./WeekView";
 
-type Mode = "month" | "week" | "day";
+export type CalendarMode = "month" | "week" | "day";
 
 type Props = {
   events: EventOut[];
@@ -22,12 +21,25 @@ type Props = {
   onCreateAt: (start: Date, durationMinutes?: number) => void;
   onEdit: (e: EventOut) => void;
   onMove: (e: EventOut, newStart: Date) => void;
+  mode: CalendarMode;
+  setMode: (m: CalendarMode) => void;
+  anchor: Date;
+  setAnchor: (d: Date) => void;
 };
 
-export function CalendarView({ events, loading, error, onRefresh, onCreateAt, onEdit, onMove }: Props) {
-  const [mode, setMode] = useState<Mode>("month");
-  const [anchor, setAnchor] = useState<Date>(() => startOfDay(new Date()));
-
+export function CalendarView({
+  events,
+  loading,
+  error,
+  onRefresh,
+  onCreateAt,
+  onEdit,
+  onMove,
+  mode,
+  setMode,
+  anchor,
+  setAnchor,
+}: Props) {
   const goPrev = () =>
     setAnchor(
       mode === "month"

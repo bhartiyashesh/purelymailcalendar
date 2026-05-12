@@ -34,6 +34,19 @@ class OrganizerOut(BaseModel):
     name: Optional[str] = None
 
 
+class ReminderIn(BaseModel):
+    action: str = "DISPLAY"  # DISPLAY or EMAIL
+    minutes_before: int = Field(default=15, ge=0, le=60 * 24 * 30)
+    description: Optional[str] = ""
+    recipients: List[str] = []  # for EMAIL: who gets it
+
+
+class ReminderOut(BaseModel):
+    action: str = "DISPLAY"
+    minutes_before: int = 15
+    description: Optional[str] = ""
+
+
 class EventIn(BaseModel):
     account: Optional[str] = None
     calendar: Optional[str] = None
@@ -45,6 +58,7 @@ class EventIn(BaseModel):
     location: Optional[str] = ""
     description: Optional[str] = ""
     attendees: List[AttendeeIn] = []
+    reminders: List[ReminderIn] = []
     dry_run: bool = False
     uid: Optional[str] = None
     sequence: Optional[int] = None
@@ -59,6 +73,7 @@ class EventOut(BaseModel):
     location: str = ""
     description: str = ""
     sequence: int = 0
+    reminders: List[ReminderOut] = []
     organizer: Optional[OrganizerOut] = None
     attendees: List[AttendeeOut] = []
 

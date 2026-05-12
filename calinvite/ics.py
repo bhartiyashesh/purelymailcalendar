@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Iterable, List, Tuple
 from zoneinfo import ZoneInfo
 
-from icalendar import Calendar, Event, Timezone, TimezoneStandard, TimezoneDaylight, vCalAddress, vText
+from icalendar import Alarm as ICalAlarm, Calendar, Event, Timezone, TimezoneStandard, TimezoneDaylight, vCalAddress, vText
 
 
 @dataclass
@@ -17,6 +17,22 @@ class Attendee:
     role: str = "REQ-PARTICIPANT"
     partstat: str = "NEEDS-ACTION"
     rsvp: bool = True
+
+
+@dataclass
+class Alarm:
+    """A VALARM nested inside the VEVENT.
+
+    action: DISPLAY (popup in client) or EMAIL (sent by a scheduler).
+    minutes_before: positive offset; we emit `-PTNm` as TRIGGER.
+    description: alarm body text. For DISPLAY this is the popup text;
+                 for EMAIL this becomes the email body.
+    recipients: empty for DISPLAY; list of email addresses for EMAIL.
+    """
+    action: str = "DISPLAY"
+    minutes_before: int = 15
+    description: str = ""
+    recipients: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -33,6 +49,7 @@ class EventSpec:
     sequence: int = 0
     tz: str = "America/Chicago"
     prodid: str = "-//calinvite//pulseproof.app//EN"
+    alarms: List[Alarm] = field(default_factory=list)
 
 
 def _vtimezone(tz_name: str) -> Timezone:
@@ -98,6 +115,22 @@ def _make_event(spec: EventSpec, status: str = "CONFIRMED") -> Tuple[Calendar, E
     ev["organizer"] = org
 
     _add_attendees(ev, spec.attendees)
+
+    # VALARMs nested inside the VEVENT. DISPLAY alarms fire on each attendee's
+    # calendar client; EMAIL alarms are written but actual sending is handled
+    # by our own scheduler (Purelymail's CalDAV doesn't fire VALARM emails).
+    for a in spec.alarms:
+        va = ICalAlarm()
+        va.add("action", a.action.upper())
+        va.add("trigger", timedelta(minutes=-abs(int(a.minutes_before))))
+        va.add("description", a.description or spec.summary)
+        if a.action.upper() == "EMAIL":
+            va.add("summary", spec.summary)
+            for r in a.recipients:
+                addr = vCalAddress(f"mailto:{r}")
+                va.add("attendee", addr, encode=0)
+        ev.add_component(va)
+
     cal.add_component(ev)
     return cal, ev
 

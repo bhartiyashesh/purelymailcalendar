@@ -18,7 +18,7 @@ from icalendar import Calendar as ICalendar
 from calinvite import caldav_client as cdav
 from calinvite import mailer
 from calinvite import rsvp as rsvp_mod
-from calinvite.ics import Attendee, EventSpec, build_cancel, build_request
+from calinvite.ics import Alarm, Attendee, EventSpec, build_cancel, build_request
 
 from .mailbox import mailbox_password
 from .models import Mailbox
@@ -60,6 +60,7 @@ from .schemas import (
     EventIn,
     EventOut,
     OrganizerOut,
+    ReminderOut,
     RsvpPollIn,
     RsvpPollOut,
     RsvpResultOut,
@@ -171,6 +172,27 @@ def serialize_vevent(comp) -> EventOut:
     except AttributeError:
         tz = None
 
+    reminders_out: List[ReminderOut] = []
+    try:
+        for sub in comp.walk("VALARM"):
+            trig = sub.get("trigger")
+            mins = 15
+            try:
+                td = trig.dt if hasattr(trig, "dt") else trig
+                if isinstance(td, timedelta):
+                    mins = max(0, int(-td.total_seconds() / 60))
+            except Exception:
+                pass
+            reminders_out.append(
+                ReminderOut(
+                    action=str(sub.get("action") or "DISPLAY").upper(),
+                    minutes_before=mins,
+                    description=str(sub.get("description") or ""),
+                )
+            )
+    except Exception:
+        pass
+
     return EventOut(
         uid=str(comp.get("uid") or ""),
         summary=str(comp.get("summary") or ""),
@@ -180,6 +202,7 @@ def serialize_vevent(comp) -> EventOut:
         location=str(comp.get("location") or ""),
         description=str(comp.get("description") or ""),
         sequence=int(comp.get("sequence") or 0),
+        reminders=reminders_out,
         organizer=organizer,
         attendees=attendees_out,
     )
@@ -192,12 +215,21 @@ def list_calendars(creds: MailboxCreds) -> List[str]:
     return _with_retry(_do)
 
 
-def list_events(creds: MailboxCreds, calendar_name: Optional[str], days: int) -> List[EventOut]:
+def list_events(
+    creds: MailboxCreds,
+    calendar_name: Optional[str],
+    days: int,
+    start_override: Optional[datetime] = None,
+    end_override: Optional[datetime] = None,
+) -> List[EventOut]:
     def _do_search():
         client = cdav.connect(creds.caldav_url, creds.email, creds.password)
         calendar = cdav.get_calendar(client, calendar_name)
-        start = datetime.now(timezone.utc)
-        end = start + timedelta(days=days)
+        if start_override is not None and end_override is not None:
+            start, end = start_override, end_override
+        else:
+            start = datetime.now(timezone.utc)
+            end = start + timedelta(days=days)
         return list(calendar.search(start=start, end=end, event=True, expand=False))
     search_results = _with_retry(_do_search)
     out: List[EventOut] = []
@@ -264,6 +296,16 @@ def _spec_from_input(inp: EventIn, creds: MailboxCreds, sequence_override: Optio
             continue
         attendees.append(Attendee(email=a.email, name=a.name))
 
+    alarms = [
+        Alarm(
+            action=r.action.upper() if r.action else "DISPLAY",
+            minutes_before=int(r.minutes_before),
+            description=r.description or inp.summary,
+            recipients=list(r.recipients or []),
+        )
+        for r in (inp.reminders or [])
+    ]
+
     return EventSpec(
         summary=inp.summary,
         start=start,
@@ -274,6 +316,7 @@ def _spec_from_input(inp: EventIn, creds: MailboxCreds, sequence_override: Optio
         description=inp.description or "",
         location=inp.location or "",
         uid=uid,
+        alarms=alarms,
         sequence=int(seq),
         tz=inp.tz,
     )
@@ -326,7 +369,18 @@ def _send_invite(creds: MailboxCreds, spec: EventSpec, body: str, ics_bytes: byt
     return to
 
 
-def create_event(creds: MailboxCreds, inp: EventIn) -> CreateEventResponse:
+def _schedule_email_reminders(user_id: Optional[int], uid: str, spec: EventSpec, inp: EventIn) -> None:
+    if user_id is None:
+        return
+    try:
+        from .reminders import replace_for_event
+        replace_for_event(user_id, uid, spec.summary, spec.start, inp)
+    except Exception as e:
+        # Don't fail the request if scheduling fails; the event itself is saved.
+        print(f"[reminders] schedule failed for {uid}: {e}")
+
+
+def create_event(creds: MailboxCreds, inp: EventIn, user_id: Optional[int] = None) -> CreateEventResponse:
     spec = _spec_from_input(inp, creds, sequence_override=0)
     ics_bytes, uid = build_request(spec)
 
@@ -336,6 +390,8 @@ def create_event(creds: MailboxCreds, inp: EventIn) -> CreateEventResponse:
         cdav.put_event(calendar, _strip_method(ics_bytes))
     _with_retry(_do_put)
 
+    _schedule_email_reminders(user_id, uid, spec, inp)
+
     sent: List[str] = []
     if not inp.dry_run:
         body = _default_body(spec, "You're invited.")
@@ -343,7 +399,7 @@ def create_event(creds: MailboxCreds, inp: EventIn) -> CreateEventResponse:
     return CreateEventResponse(uid=uid, sent_to=sent, dry_run=inp.dry_run)
 
 
-def update_event(creds: MailboxCreds, uid: str, inp: EventIn) -> CreateEventResponse:
+def update_event(creds: MailboxCreds, uid: str, inp: EventIn, user_id: Optional[int] = None) -> CreateEventResponse:
     if not uid:
         raise ValueError("uid is required for update")
     new_seq = int(inp.sequence) if inp.sequence is not None and int(inp.sequence) >= 1 else 1
@@ -357,6 +413,8 @@ def update_event(creds: MailboxCreds, uid: str, inp: EventIn) -> CreateEventResp
         cdav.put_event(calendar, _strip_method(ics_bytes))
     _with_retry(_do_put)
 
+    _schedule_email_reminders(user_id, uid_out, spec, inp)
+
     sent: List[str] = []
     if not inp.dry_run:
         body = _default_body(spec, "This invitation has been updated.")
@@ -364,7 +422,7 @@ def update_event(creds: MailboxCreds, uid: str, inp: EventIn) -> CreateEventResp
     return CreateEventResponse(uid=uid_out, sent_to=sent, dry_run=inp.dry_run)
 
 
-def cancel_event(creds: MailboxCreds, uid: str, inp: EventIn) -> CreateEventResponse:
+def cancel_event(creds: MailboxCreds, uid: str, inp: EventIn, user_id: Optional[int] = None) -> CreateEventResponse:
     if not uid:
         raise ValueError("uid is required for cancel")
     new_seq = int(inp.sequence) if inp.sequence is not None and int(inp.sequence) >= 1 else 1
@@ -382,6 +440,13 @@ def cancel_event(creds: MailboxCreds, uid: str, inp: EventIn) -> CreateEventResp
             ev.delete()
         except Exception:
             pass
+
+    if user_id is not None:
+        try:
+            from .reminders import cancel_for_event
+            cancel_for_event(user_id, uid_out)
+        except Exception as e:
+            print(f"[reminders] cancel failed for {uid_out}: {e}")
 
     sent: List[str] = []
     if not inp.dry_run:

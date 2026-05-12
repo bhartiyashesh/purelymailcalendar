@@ -65,10 +65,18 @@ export const api = {
 
   // data
   calendars: () => request<CalendarSummary[]>("/api/calendars"),
-  events: (calendar?: string, days = 60) => {
+  events: (
+    calendar?: string,
+    days = 60,
+    range?: { from: Date; to: Date }
+  ) => {
     const q = new URLSearchParams();
     q.set("days", String(days));
     if (calendar) q.set("calendar", calendar);
+    if (range) {
+      q.set("start", range.from.toISOString());
+      q.set("end", range.to.toISOString());
+    }
     return request<EventOut[]>(`/api/events?${q.toString()}`);
   },
   createEvent: (body: EventIn) =>

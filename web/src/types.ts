@@ -32,6 +32,12 @@ export type OrganizerOut = {
   name?: string | null;
 };
 
+export type ReminderOut = {
+  action: "DISPLAY" | "EMAIL" | string;
+  minutes_before: number;
+  description?: string;
+};
+
 export type EventOut = {
   uid: string;
   summary: string;
@@ -41,8 +47,16 @@ export type EventOut = {
   location: string;
   description: string;
   sequence: number;
+  reminders?: ReminderOut[];
   organizer?: OrganizerOut | null;
   attendees: AttendeeOut[];
+};
+
+export type ReminderIn = {
+  action: "DISPLAY" | "EMAIL";
+  minutes_before: number;
+  description?: string;
+  recipients?: string[];
 };
 
 export type EventIn = {
@@ -56,6 +70,7 @@ export type EventIn = {
   location?: string;
   description?: string;
   attendees: AttendeeIn[];
+  reminders?: ReminderIn[];
   dry_run?: boolean;
   uid?: string;
   sequence?: number;

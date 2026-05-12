@@ -64,7 +64,17 @@ export function LoginView() {
           </form>
         )}
       </div>
-      <div className="mt-6 max-w-md text-center">
+      <div className="mt-6 max-w-md space-y-3 text-center">
+        <p className="text-xs text-ink-500">
+          A free calendar and meeting-invite app for{" "}
+          <span className="font-medium text-ink-700">Purelymail</span> mailboxes.
+          Send iTIP invitations to Gmail, Apple Mail, and Outlook and have RSVPs
+          flow back into your calendar automatically.{" "}
+          <a href="/about" className="font-medium text-accent-700 underline-offset-2 hover:text-accent-900 hover:underline">
+            Learn more
+          </a>
+          .
+        </p>
         <UnofficialNote />
       </div>
     </div>

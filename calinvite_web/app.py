@@ -14,6 +14,7 @@ from . import services
 from .auth import current_user, router as auth_router
 from .db import Base, engine
 from .mailbox import router as mailbox_router
+from .reminders import router as reminders_router
 from .models import User
 from .schemas import (
     CalendarOut,
@@ -45,6 +46,7 @@ def _startup() -> None:
 
 app.include_router(auth_router)
 app.include_router(mailbox_router)
+app.include_router(reminders_router)
 
 
 def _creds(user: User) -> services.MailboxCreds:
@@ -71,11 +73,33 @@ def get_calendars(user: User = Depends(current_user)):
 def get_events(
     days: int = Query(60, ge=1, le=365),
     calendar: Optional[str] = None,
+    start: Optional[str] = Query(None, description="ISO-8601 start of fetch window. If set with `end`, overrides `days`."),
+    end: Optional[str] = Query(None, description="ISO-8601 end of fetch window. If set with `start`, overrides `days`."),
     user: User = Depends(current_user),
 ):
+    from datetime import datetime, timezone
+
     creds = _creds(user)
+    start_override = None
+    end_override = None
+    if start and end:
+        try:
+            sd = datetime.fromisoformat(start.replace("Z", "+00:00"))
+            ed = datetime.fromisoformat(end.replace("Z", "+00:00"))
+            if sd.tzinfo is None:
+                sd = sd.replace(tzinfo=timezone.utc)
+            if ed.tzinfo is None:
+                ed = ed.replace(tzinfo=timezone.utc)
+            if ed <= sd:
+                raise HTTPException(status_code=400, detail="`end` must be after `start`")
+            start_override = sd
+            end_override = ed
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"invalid start/end: {e}")
     try:
-        return services.list_events(creds, calendar, days)
+        return services.list_events(creds, calendar, days, start_override, end_override)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"CalDAV error: {e}")
 
@@ -93,7 +117,7 @@ def get_event(uid: str, calendar: Optional[str] = None, user: User = Depends(cur
 def post_event(body: EventIn, user: User = Depends(current_user)):
     creds = _creds(user)
     try:
-        return services.create_event(creds, body)
+        return services.create_event(creds, body, user_id=user.id)
     except (RuntimeError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -104,7 +128,7 @@ def post_event(body: EventIn, user: User = Depends(current_user)):
 def put_event(uid: str, body: EventIn, user: User = Depends(current_user)):
     creds = _creds(user)
     try:
-        return services.update_event(creds, uid, body)
+        return services.update_event(creds, uid, body, user_id=user.id)
     except (RuntimeError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -115,7 +139,7 @@ def put_event(uid: str, body: EventIn, user: User = Depends(current_user)):
 def cancel_event(uid: str, body: EventIn, user: User = Depends(current_user)):
     creds = _creds(user)
     try:
-        result = services.cancel_event(creds, uid, body)
+        result = services.cancel_event(creds, uid, body, user_id=user.id)
         return CancelEventResponse(uid=result.uid, sent_to=result.sent_to)
     except (RuntimeError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -140,6 +164,13 @@ if _static_dir.is_dir():
 
     @app.get("/")
     def index():
+        return FileResponse(_static_dir / "index.html")
+
+    @app.get("/about")
+    def about_page():
+        about_html = _static_dir / "about.html"
+        if about_html.is_file():
+            return FileResponse(about_html)
         return FileResponse(_static_dir / "index.html")
 
     @app.get("/{full_path:path}")

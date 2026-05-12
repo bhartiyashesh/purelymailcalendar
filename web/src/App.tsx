@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, AuthRequiredError } from "./api";
 import type { CalendarSummary, EventIn, EventOut, Me } from "./types";
 import { Header } from "./components/Header";
 import { EventsView } from "./components/EventsView";
 import { EventForm } from "./components/EventForm";
 import { RsvpsView } from "./components/RsvpsView";
-import { CalendarView } from "./components/CalendarView";
+import { CalendarView, type CalendarMode } from "./components/CalendarView";
 import { LoginView } from "./components/LoginView";
 import { VerifyView } from "./components/VerifyView";
 import { OnboardingView } from "./components/OnboardingView";
 import { UnofficialNote } from "./components/UnofficialNote";
 import { ToastStack, type ToastMsg } from "./components/Toast";
-import { fmtTimeShort } from "./util";
+import { addDays, buildMonthGrid, fmtTimeShort, startOfDay, startOfWeek } from "./util";
+import { useReminders } from "./useReminders";
 
 type Tab = "calendar" | "events" | "rsvps";
 type FormState =
@@ -126,7 +127,26 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
   }, []);
 
   const [tab, setTab] = useState<Tab>("calendar");
+  const [calMode, setCalMode] = useState<CalendarMode>("month");
+  const [calAnchor, setCalAnchor] = useState<Date>(() => startOfDay(new Date()));
   const [form, setForm] = useState<FormState>({ open: false });
+
+  // Compute the CalDAV fetch range from the active tab + view state, so the
+  // server only returns events that are actually visible. Calendar tab uses
+  // the visible grid range; Events tab uses the `now → now+days` window.
+  const fetchRange = useMemo<{ from: Date; to: Date } | undefined>(() => {
+    if (tab !== "calendar") return undefined;
+    if (calMode === "month") {
+      const grid = buildMonthGrid(calAnchor);
+      return { from: grid[0], to: addDays(grid[grid.length - 1], 1) };
+    }
+    if (calMode === "week") {
+      const start = startOfWeek(calAnchor);
+      return { from: start, to: addDays(start, 7) };
+    }
+    const day = startOfDay(calAnchor);
+    return { from: day, to: addDays(day, 1) };
+  }, [tab, calMode, calAnchor]);
 
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const toastIdRef = useRef(1);
@@ -136,6 +156,36 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
   }, []);
   const dismissToast = useCallback((id: number) => {
     setToasts((t) => t.filter((x) => x.id !== id));
+  }, []);
+
+  // In-tab reminder scheduler. Fires a blocking fullscreen alert that the user
+  // must dismiss, plus a native browser Notification (if granted) for when the
+  // tab isn't focused.
+  const [reminderAlerts, setReminderAlerts] = useState<
+    { id: number; title: string; offsetText: string; event: EventOut }[]
+  >([]);
+  const reminderIdRef = useRef(1);
+  useReminders(events, (ev, _r, offsetText) => {
+    const id = reminderIdRef.current++;
+    setReminderAlerts((prev) => [...prev, { id, title: ev.summary, offsetText, event: ev }]);
+    const notifBody = `Starts ${offsetText} — ${new Date(ev.start).toLocaleString()}`;
+    try {
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(`Reminder: ${ev.summary}`, { body: notifBody, tag: ev.uid });
+      }
+    } catch {
+      // ignore
+    }
+    try {
+      const orig = document.title;
+      document.title = `🔔 ${ev.summary}`;
+      setTimeout(() => { document.title = orig; }, 8000);
+    } catch {
+      // ignore
+    }
+  });
+  const dismissReminder = useCallback((id: number) => {
+    setReminderAlerts((prev) => prev.filter((r) => r.id !== id));
   }, []);
 
   const handle = useCallback(
@@ -157,7 +207,7 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
     setEventsLoading(true);
     setEventsError(null);
     try {
-      const list = await handle(() => api.events(calendar || undefined, days));
+      const list = await handle(() => api.events(calendar || undefined, days, fetchRange));
       if (list) {
         const seenUids = new Set(list.map((e) => e.uid));
         // Server confirmed any pending UIDs that appear; drop them from pending.
@@ -179,7 +229,7 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
     } finally {
       setEventsLoading(false);
     }
-  }, [calendar, days, handle]);
+  }, [calendar, days, fetchRange, handle]);
 
   useEffect(() => {
     (async () => {
@@ -362,6 +412,7 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
       />
 
       <div className="mx-auto max-w-6xl px-4">
+        <QuietLoader active={eventsLoading} />
         <nav className="mt-4 flex gap-1 border-b border-ink-200">
           <TabButton active={tab === "calendar"} onClick={() => setTab("calendar")}>Calendar</TabButton>
           <TabButton active={tab === "events"} onClick={() => setTab("events")}>Events</TabButton>
@@ -378,6 +429,10 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
               onCreateAt={onCreateAt}
               onEdit={onEditClick}
               onMove={onMoveEvent}
+              mode={calMode}
+              setMode={setCalMode}
+              anchor={calAnchor}
+              setAnchor={setCalAnchor}
             />
           )}
           {tab === "events" && (
@@ -421,6 +476,92 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
       )}
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
+
+      {reminderAlerts.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/70 p-4">
+          {(() => {
+            const a = reminderAlerts[0];
+            return (
+              <div
+                role="alertdialog"
+                aria-modal="true"
+                aria-labelledby="reminder-title"
+                className="w-full max-w-md rounded-xl border border-ink-200 bg-white p-6 text-center shadow-2xl"
+              >
+                <div className="mb-3 flex justify-center text-accent-600">
+                  <svg
+                    aria-hidden="true"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 32 32"
+                    fill="currentColor"
+                    className="h-12 w-12"
+                  >
+                    <path d="M30,23.3818l-2-1V20a6.0046,6.0046,0,0,0-5-5.91V12H21v2.09A6.0046,6.0046,0,0,0,16,20v2.3818l-2,1V28h6v2h4V28h6ZM28,26H16V24.6182l2-1V20a4,4,0,0,1,8,0v3.6182l2,1Z" />
+                    <path d="M28,6a2,2,0,0,0-2-2H22V2H20V4H12V2H10V4H6A2,2,0,0,0,4,6V26a2,2,0,0,0,2,2h4V26H6V6h4V8h2V6h8V8h2V6h4v6h2Z" />
+                  </svg>
+                </div>
+                <h2 id="reminder-title" className="text-xl font-semibold text-ink-900">
+                  {a.title}
+                </h2>
+                <p className="mt-1 text-sm font-medium text-accent-700">Starts {a.offsetText}</p>
+                <dl className="mt-4 grid gap-2 text-left text-sm">
+                  <div>
+                    <dt className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">When</dt>
+                    <dd className="text-ink-800">
+                      {new Date(a.event.start).toLocaleString()}
+                      {a.event.tz ? ` · ${a.event.tz}` : ""}
+                    </dd>
+                  </div>
+                  {a.event.location && (
+                    <div>
+                      <dt className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">Where</dt>
+                      <dd className="break-words text-ink-800">{a.event.location}</dd>
+                    </div>
+                  )}
+                  {a.event.attendees && a.event.attendees.length > 0 && (
+                    <div>
+                      <dt className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+                        Attendees ({a.event.attendees.length})
+                      </dt>
+                      <dd className="break-words text-ink-700">
+                        {a.event.attendees.map((x) => x.email).join(", ")}
+                      </dd>
+                    </div>
+                  )}
+                  {a.event.description && (
+                    <div>
+                      <dt className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">Description</dt>
+                      <dd className="whitespace-pre-wrap text-ink-700">{a.event.description}</dd>
+                    </div>
+                  )}
+                </dl>
+                {reminderAlerts.length > 1 && (
+                  <p className="mt-3 text-xs text-ink-500">
+                    +{reminderAlerts.length - 1} more reminder{reminderAlerts.length - 1 === 1 ? "" : "s"} queued
+                  </p>
+                )}
+                <button
+                  autoFocus
+                  onClick={() => dismissReminder(a.id)}
+                  className="btn-primary mt-5 w-full"
+                >
+                  Dismiss
+                </button>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuietLoader({ active }: { active: boolean }) {
+  return (
+    <div className="mt-2 h-[2px] w-full overflow-hidden rounded-full bg-ink-100" aria-hidden="true">
+      <div
+        className={`h-full w-1/3 rounded-full bg-accent-500 ${active ? "animate-loader-slide" : "opacity-0"}`}
+      />
     </div>
   );
 }
