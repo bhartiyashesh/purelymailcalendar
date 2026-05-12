@@ -130,6 +130,7 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
   const [calMode, setCalMode] = useState<CalendarMode>("month");
   const [calAnchor, setCalAnchor] = useState<Date>(() => startOfDay(new Date()));
   const [form, setForm] = useState<FormState>({ open: false });
+  const [cancelChoice, setCancelChoice] = useState<EventOut | null>(null);
 
   // Compute the CalDAV fetch range from the active tab + view state, so the
   // server only returns events that are actually visible. Calendar tab uses
@@ -334,8 +335,9 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
     }
   };
 
-  const onCancelClick = async (e: EventOut) => {
-    if (!confirm(`Cancel "${e.summary}" and notify attendees?`)) return;
+  // Cancel the entire series (or a one-off event). Used by the simple
+  // confirm flow and by the "Entire series" path of the recurring chooser.
+  const cancelWholeEvent = async (e: EventOut) => {
     const body: EventIn = {
       calendar: calendar || undefined,
       summary: e.summary,
@@ -345,14 +347,15 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
       location: e.location,
       description: e.description,
       attendees: e.attendees.map((a) => ({ email: a.email, name: a.name || undefined })),
-      uid: e.uid,
+      uid: e.master_uid || e.uid,
       sequence: e.sequence + 1,
     };
     try {
-      const res = await handle(() => api.cancelEvent(e.uid, body));
+      const res = await handle(() => api.cancelEvent(e.master_uid || e.uid, body));
       if (!res) return;
-      clearPending(e.uid);
-      setEvents((prev) => prev.filter((x) => x.uid !== e.uid));
+      clearPending(e.master_uid || e.uid);
+      const masterUid = e.master_uid || e.uid;
+      setEvents((prev) => prev.filter((x) => (x.master_uid || x.uid) !== masterUid));
       pushToast(
         "success",
         res.sent_to.length
@@ -363,6 +366,31 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
     } catch (err: any) {
       pushToast("error", err?.message || "cancel failed");
     }
+  };
+
+  // Cancel a single occurrence of a recurring event (adds EXDATE on master,
+  // sends iTIP CANCEL with RECURRENCE-ID for that date).
+  const cancelOneOccurrence = async (e: EventOut) => {
+    try {
+      const masterUid = e.master_uid || e.uid;
+      const res = await handle(() => api.cancelOccurrence(masterUid, e.start));
+      if (!res) return;
+      const occId = e.occurrence_id;
+      setEvents((prev) => prev.filter((x) => (occId ? x.occurrence_id !== occId : x.uid !== e.uid)));
+      pushToast("success", "Cancelled this occurrence.");
+      refreshEvents();
+    } catch (err: any) {
+      pushToast("error", err?.message || "cancel failed");
+    }
+  };
+
+  const onCancelClick = async (e: EventOut) => {
+    if (e.recurrence) {
+      setCancelChoice(e);  // Show the 3-way modal
+      return;
+    }
+    if (!confirm(`Cancel "${e.summary}" and notify attendees?`)) return;
+    await cancelWholeEvent(e);
   };
 
   const submitForm = async (body: EventIn, mode: "create" | "edit", uid: string | null) => {
@@ -472,7 +500,68 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
           defaultCalendar={calendar}
           onClose={() => setForm({ open: false })}
           onSubmit={submitForm}
+          onCancelEvent={(ev) => {
+            setForm({ open: false });
+            onCancelClick(ev);
+          }}
         />
+      )}
+
+      {cancelChoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cancel-choice-title"
+            className="w-full max-w-md rounded-xl border border-ink-200 bg-white p-5 shadow-2xl"
+          >
+            <h2 id="cancel-choice-title" className="text-base font-semibold text-ink-900">
+              Cancel recurring event
+            </h2>
+            <p className="mt-1 text-sm text-ink-600">
+              <span className="font-medium text-ink-800">{cancelChoice.summary}</span> repeats
+              {cancelChoice.recurrence?.text ? ` (${cancelChoice.recurrence.text.toLowerCase()})` : ""}.
+              What do you want to cancel?
+            </p>
+            <p className="mt-1 text-xs text-ink-500">
+              Showing the occurrence on{" "}
+              {new Date(cancelChoice.start).toLocaleString(undefined, {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+              .
+            </p>
+            <div className="mt-4 flex flex-col gap-2">
+              <button
+                className="btn-secondary"
+                onClick={async () => {
+                  const target = cancelChoice;
+                  setCancelChoice(null);
+                  await cancelOneOccurrence(target);
+                }}
+              >
+                Just this occurrence
+              </button>
+              <button
+                className="btn-danger"
+                onClick={async () => {
+                  const target = cancelChoice;
+                  setCancelChoice(null);
+                  if (!confirm(`Cancel the entire "${target.summary}" series and notify attendees?`)) return;
+                  await cancelWholeEvent(target);
+                }}
+              >
+                Entire series
+              </button>
+              <button className="btn-secondary" onClick={() => setCancelChoice(null)}>
+                Keep event
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />

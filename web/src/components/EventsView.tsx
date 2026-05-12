@@ -44,7 +44,7 @@ export function EventsView({ events, loading, error, onEdit, onCancel, onRefresh
       )}
       <div className="flex flex-col gap-2">
         {events.map((e) => (
-          <EventCard key={e.uid} event={e} onEdit={onEdit} onCancel={onCancel} />
+          <EventCard key={e.occurrence_id || e.uid} event={e} onEdit={onEdit} onCancel={onCancel} />
         ))}
       </div>
     </section>

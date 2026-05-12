@@ -1,6 +1,51 @@
 import { useEffect, useMemo, useState } from "react";
-import type { EventIn, EventOut, ReminderIn } from "../types";
+import type { EventIn, EventOut, RecurrenceFreq, RecurrenceIn, ReminderIn } from "../types";
 import { toLocalIsoMinute } from "../util";
+
+type RepeatEnd = "never" | "on" | "after";
+type RepeatRow = {
+  freq: RecurrenceFreq;
+  interval: number;
+  end: RepeatEnd;
+  until: string; // YYYY-MM-DD when end="on"
+  count: number; // when end="after"
+};
+
+const DEFAULT_REPEAT: RepeatRow = {
+  freq: "WEEKLY",
+  interval: 1,
+  end: "never",
+  until: "",
+  count: 10,
+};
+
+function repeatFromInitial(initial?: EventOut | null): { enabled: boolean; row: RepeatRow } {
+  const rec = initial?.recurrence;
+  if (!rec) return { enabled: false, row: DEFAULT_REPEAT };
+  return {
+    enabled: true,
+    row: {
+      freq: rec.freq,
+      interval: rec.interval || 1,
+      end: rec.until ? "on" : rec.count ? "after" : "never",
+      until: rec.until || "",
+      count: rec.count || 10,
+    },
+  };
+}
+
+function repeatSummary(r: RepeatRow): string {
+  const noun = { DAILY: "day", WEEKLY: "week", MONTHLY: "month", YEARLY: "year" }[r.freq];
+  const base = r.interval === 1
+    ? `Every ${noun}`
+    : `Every ${r.interval} ${noun}s`;
+  if (r.end === "on" && r.until) {
+    const d = new Date(r.until + "T00:00:00");
+    return `${base}, until ${d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`;
+  }
+  if (r.end === "after") return `${base}, ${r.count} times`;
+  return base;
+}
 
 type ReminderRow = {
   popup: boolean;
@@ -51,6 +96,10 @@ type Props = {
     mode: Mode,
     uid: string | null
   ) => Promise<void>;
+  // Triggered when the user clicks "Cancel event" in edit mode. The parent
+  // owns the actual cancel flow (incl. the recurring chooser modal) so it
+  // can re-use the same logic from the EventCard path.
+  onCancelEvent?: (initial: EventOut) => void;
 };
 
 type AttRow = { email: string; name: string };
@@ -88,7 +137,7 @@ function localFromIso(iso: string): string {
   return toLocalIsoMinute(new Date(iso));
 }
 
-export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes, defaultAccount, defaultCalendar, onClose, onSubmit }: Props) {
+export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes, defaultAccount, defaultCalendar, onClose, onSubmit, onCancelEvent }: Props) {
   const [summary, setSummary] = useState(initial?.summary || "");
   const [start, setStart] = useState(
     snapToFive(
@@ -106,6 +155,9 @@ export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes,
   const [reminders, setReminders] = useState<ReminderRow[]>(
     initial ? [] : [{ popup: true, email: false, allAttendees: true, amount: 15, unit: "minutes", recipients: "" }]
   );
+  const initialRepeat = useMemo(() => repeatFromInitial(initial), [initial]);
+  const [repeatEnabled, setRepeatEnabled] = useState<boolean>(initialRepeat.enabled);
+  const [repeat, setRepeat] = useState<RepeatRow>(initialRepeat.row);
   const [dryRun, setDryRun] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -150,6 +202,19 @@ export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes,
       return `${y}-${mo}-${d}T${hh}:${snapped}`;
     })();
 
+    let recurrence: RecurrenceIn | null = null;
+    if (repeatEnabled) {
+      recurrence = {
+        freq: repeat.freq,
+        interval: Math.max(1, repeat.interval | 0),
+      };
+      if (repeat.end === "on" && repeat.until) {
+        recurrence.until = repeat.until;
+      } else if (repeat.end === "after") {
+        recurrence.count = Math.max(1, repeat.count | 0);
+      }
+    }
+
     const body: EventIn = {
       account: defaultAccount || undefined,
       calendar: defaultCalendar || undefined,
@@ -159,6 +224,7 @@ export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes,
       tz,
       location: location.trim(),
       description,
+      recurrence,
       attendees: attendees
         .map((r) => ({ email: r.email.trim(), name: r.name.trim() || undefined }))
         .filter((r) => !!r.email),
@@ -273,6 +339,81 @@ export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes,
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
+            </div>
+            <div>
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-ink-800">
+                <input
+                  type="checkbox"
+                  checked={repeatEnabled}
+                  onChange={(e) => setRepeatEnabled(e.target.checked)}
+                  className="h-4 w-4 rounded border-ink-300 text-accent-600 focus:ring-accent-500"
+                />
+                Repeat
+              </label>
+              {repeatEnabled && (
+                <div className="mt-2 space-y-2 rounded-md border border-ink-200 bg-ink-50 p-3">
+                  <div className="grid grid-cols-12 items-center gap-2">
+                    <label className="col-span-3 text-xs text-ink-600">Every</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      className="field col-span-3"
+                      value={repeat.interval}
+                      onChange={(e) =>
+                        setRepeat((r) => ({ ...r, interval: Math.max(1, Number(e.target.value) || 1) }))
+                      }
+                    />
+                    <select
+                      className="field col-span-6"
+                      value={repeat.freq}
+                      onChange={(e) => setRepeat((r) => ({ ...r, freq: e.target.value as RecurrenceFreq }))}
+                    >
+                      <option value="DAILY">day(s)</option>
+                      <option value="WEEKLY">week(s)</option>
+                      <option value="MONTHLY">month(s)</option>
+                      <option value="YEARLY">year(s)</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-12 items-center gap-2">
+                    <label className="col-span-3 text-xs text-ink-600">Ends</label>
+                    <select
+                      className="field col-span-3"
+                      value={repeat.end}
+                      onChange={(e) => setRepeat((r) => ({ ...r, end: e.target.value as RepeatEnd }))}
+                    >
+                      <option value="never">never</option>
+                      <option value="on">on date</option>
+                      <option value="after">after N times</option>
+                    </select>
+                    {repeat.end === "on" && (
+                      <input
+                        type="date"
+                        className="field col-span-6"
+                        value={repeat.until}
+                        onChange={(e) => setRepeat((r) => ({ ...r, until: e.target.value }))}
+                      />
+                    )}
+                    {repeat.end === "after" && (
+                      <input
+                        type="number"
+                        min={1}
+                        max={1000}
+                        className="field col-span-6"
+                        value={repeat.count}
+                        onChange={(e) =>
+                          setRepeat((r) => ({ ...r, count: Math.max(1, Number(e.target.value) || 1) }))
+                        }
+                      />
+                    )}
+                    {repeat.end === "never" && <div className="col-span-6" />}
+                  </div>
+                  <p className="text-xs text-ink-600">{repeatSummary(repeat)}</p>
+                  <p className="text-xs text-ink-500">
+                    Email reminders fire before each occurrence. The email includes confirm/cancel buttons so you can drop a single occurrence without touching the rest of the series.
+                  </p>
+                </div>
+              )}
             </div>
             <div>
               <div className="mb-2 flex items-center justify-between">
@@ -482,8 +623,19 @@ export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes,
             )}
           </div>
         </div>
-        <div className="flex items-center justify-end gap-2 border-t border-ink-200 px-5 py-3">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+        <div className="flex items-center gap-2 border-t border-ink-200 px-5 py-3">
+          {mode === "edit" && initial && onCancelEvent && (
+            <button
+              type="button"
+              className="btn-danger"
+              onClick={() => onCancelEvent(initial)}
+              disabled={busy}
+            >
+              Cancel event
+            </button>
+          )}
+          <div className="flex-1" />
+          <button type="button" className="btn-secondary" onClick={onClose}>Close</button>
           <button type="submit" disabled={busy} className="btn-primary">
             {busy ? "Sending..." : mode === "edit" ? "Save & resend" : "Create & send invite"}
           </button>

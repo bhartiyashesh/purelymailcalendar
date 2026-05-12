@@ -18,7 +18,7 @@ from icalendar import Calendar as ICalendar
 from calinvite import caldav_client as cdav
 from calinvite import mailer
 from calinvite import rsvp as rsvp_mod
-from calinvite.ics import Alarm, Attendee, EventSpec, build_cancel, build_request
+from calinvite.ics import Alarm, Attendee, EventSpec, Recurrence, build_cancel, build_request
 
 from .mailbox import mailbox_password
 from .models import Mailbox
@@ -60,6 +60,7 @@ from .schemas import (
     EventIn,
     EventOut,
     OrganizerOut,
+    RecurrenceOut,
     ReminderOut,
     RsvpPollIn,
     RsvpPollOut,
@@ -124,6 +125,56 @@ def _to_aware(dt) -> datetime:
             return dt.replace(tzinfo=timezone.utc)
         return dt
     return datetime(dt.year, dt.month, dt.day, tzinfo=timezone.utc)
+
+
+def _rrule_to_recurrence_out(rrule_val) -> Optional["RecurrenceOut"]:
+    """Convert an icalendar vRecur into our RecurrenceOut, with a friendly text."""
+    if rrule_val is None:
+        return None
+    try:
+        # vRecur is a dict-like; each value is a list.
+        def first(key):
+            v = rrule_val.get(key)
+            if v is None:
+                return None
+            return v[0] if isinstance(v, list) else v
+
+        freq = str(first("FREQ") or "").upper()
+        if freq not in ("DAILY", "WEEKLY", "MONTHLY", "YEARLY"):
+            return None
+        interval = int(first("INTERVAL") or 1)
+        until_val = first("UNTIL")
+        count_val = first("COUNT")
+        from_date = None
+        if isinstance(until_val, datetime):
+            from_date = until_val.date()
+        elif hasattr(until_val, "year"):  # date
+            from_date = until_val
+        count_int = int(count_val) if count_val is not None else None
+
+        bits = {
+            "DAILY": "Daily",
+            "WEEKLY": "Weekly",
+            "MONTHLY": "Monthly",
+            "YEARLY": "Yearly",
+        }
+        text = bits[freq]
+        if interval > 1:
+            text = f"Every {interval} " + {"DAILY": "days", "WEEKLY": "weeks", "MONTHLY": "months", "YEARLY": "years"}[freq]
+        if from_date is not None:
+            text += f", ends {from_date.strftime('%b %-d, %Y')}"
+        elif count_int is not None:
+            text += f", {count_int} times"
+
+        return RecurrenceOut(
+            freq=freq,  # type: ignore[arg-type]
+            interval=interval,
+            until=from_date,
+            count=count_int,
+            text=text,
+        )
+    except Exception:
+        return None
 
 
 def serialize_vevent(comp) -> EventOut:
@@ -193,8 +244,11 @@ def serialize_vevent(comp) -> EventOut:
     except Exception:
         pass
 
+    uid = str(comp.get("uid") or "")
+    recurrence_out = _rrule_to_recurrence_out(comp.get("rrule"))
+
     return EventOut(
-        uid=str(comp.get("uid") or ""),
+        uid=uid,
         summary=str(comp.get("summary") or ""),
         start=dtstart,
         end=dtend,
@@ -205,6 +259,9 @@ def serialize_vevent(comp) -> EventOut:
         reminders=reminders_out,
         organizer=organizer,
         attendees=attendees_out,
+        recurrence=recurrence_out,
+        master_uid=uid,
+        occurrence_id=uid,
     )
 
 
@@ -222,15 +279,21 @@ def list_events(
     start_override: Optional[datetime] = None,
     end_override: Optional[datetime] = None,
 ) -> List[EventOut]:
+    if start_override is not None and end_override is not None:
+        window_start, window_end = start_override, end_override
+    else:
+        window_start = datetime.now(timezone.utc)
+        window_end = window_start + timedelta(days=days)
+
     def _do_search():
         client = cdav.connect(creds.caldav_url, creds.email, creds.password)
         calendar = cdav.get_calendar(client, calendar_name)
-        if start_override is not None and end_override is not None:
-            start, end = start_override, end_override
-        else:
-            start = datetime.now(timezone.utc)
-            end = start + timedelta(days=days)
-        return list(calendar.search(start=start, end=end, event=True, expand=False))
+        return list(
+            calendar.search(
+                start=window_start, end=window_end, event=True, expand=False
+            )
+        )
+
     search_results = _with_retry(_do_search)
     out: List[EventOut] = []
     for ev in search_results:
@@ -240,9 +303,36 @@ def list_events(
             continue
         for comp in cal.walk("VEVENT"):
             try:
-                out.append(serialize_vevent(comp))
+                base = serialize_vevent(comp)
             except Exception:
                 continue
+            if comp.get("rrule") is None:
+                out.append(base)
+                continue
+            # Recurring master: expand into individual occurrences inside the
+            # visible window using the recurring-ical-events lib (already a
+            # dependency). Each occurrence becomes its own EventOut with a
+            # synthetic occurrence_id so the frontend can address it.
+            try:
+                import recurring_ical_events as rie
+
+                expanded = rie.of(cal).between(window_start, window_end)
+            except Exception:
+                # If expansion fails, surface the master once so it isn't lost.
+                out.append(base)
+                continue
+            for inst in expanded:
+                inst_start = _to_aware(inst.get("dtstart").dt) if inst.get("dtstart") else base.start
+                inst_end = _to_aware(inst.get("dtend").dt) if inst.get("dtend") else base.end
+                out.append(
+                    base.model_copy(
+                        update={
+                            "start": inst_start,
+                            "end": inst_end,
+                            "occurrence_id": f"{base.master_uid}#{inst_start.isoformat()}",
+                        }
+                    )
+                )
     out.sort(key=lambda e: e.start)
     return out
 
@@ -306,6 +396,15 @@ def _spec_from_input(inp: EventIn, creds: MailboxCreds, sequence_override: Optio
         for r in (inp.reminders or [])
     ]
 
+    recurrence = None
+    if inp.recurrence is not None:
+        recurrence = Recurrence(
+            freq=inp.recurrence.freq,
+            interval=int(inp.recurrence.interval or 1),
+            until=inp.recurrence.until,
+            count=inp.recurrence.count,
+        )
+
     return EventSpec(
         summary=inp.summary,
         start=start,
@@ -319,6 +418,7 @@ def _spec_from_input(inp: EventIn, creds: MailboxCreds, sequence_override: Optio
         alarms=alarms,
         sequence=int(seq),
         tz=inp.tz,
+        recurrence=recurrence,
     )
 
 
@@ -453,6 +553,178 @@ def cancel_event(creds: MailboxCreds, uid: str, inp: EventIn, user_id: Optional[
         body = _default_body(spec, "This event has been cancelled.")
         sent = _send_invite(creds, spec, body, ics_bytes, method="CANCEL")
     return CreateEventResponse(uid=uid_out, sent_to=sent, dry_run=inp.dry_run)
+
+
+def cancel_occurrence(user_id: int, event_uid: str, occurrence_start: datetime) -> None:
+    """Cancel a single occurrence of a recurring event.
+
+    Steps:
+      1. Look up the user and mailbox creds.
+      2. Fetch the master VEVENT from CalDAV (across all calendars).
+      3. Add an EXDATE for `occurrence_start`, bump SEQUENCE, PUT back.
+      4. Build a per-occurrence iTIP CANCEL (same UID, RECURRENCE-ID, METHOD:CANCEL).
+      5. Email the cancel notice to attendees.
+      6. Delete the matching ScheduledReminder row (caller stamps declined_at).
+    """
+    from .db import SessionLocal as _SL
+    from .models import User as _User
+    from .reminders import cancel_for_occurrence
+
+    with _SL() as db:
+        user = db.query(_User).filter(_User.id == user_id).one_or_none()
+        if user is None or user.mailbox is None:
+            raise RuntimeError("user or mailbox missing")
+        mb = user.mailbox
+        creds = creds_for(mb)
+
+    def _find():
+        client = cdav.connect(creds.caldav_url, creds.email, creds.password)
+        # We don't know which calendar holds the event — try them all.
+        for cname in cdav.list_calendars(client):
+            cal_obj = cdav.get_calendar(client, cname)
+            found = cdav.find_event_by_uid(cal_obj, event_uid)
+            if found is not None:
+                return cal_obj, found
+        return None, None
+
+    cal_obj, ev = _with_retry(_find)
+    if ev is None:
+        raise RuntimeError(f"event {event_uid} not found on any calendar")
+
+    # Parse master, add EXDATE, bump SEQUENCE, strip METHOD, PUT back.
+    master_cal = ICalendar.from_ical(ev.data)
+    master_vevent = None
+    for comp in master_cal.walk("VEVENT"):
+        if str(comp.get("uid")) == event_uid:
+            master_vevent = comp
+            break
+    if master_vevent is None:
+        raise RuntimeError("master VEVENT not found in event payload")
+
+    # Make occurrence_start timezone-aware (use the master's DTSTART tz if possible)
+    occ = occurrence_start
+    if occ.tzinfo is None:
+        try:
+            tzparam = master_vevent.get("dtstart").params.get("TZID")
+            if tzparam:
+                occ = occ.replace(tzinfo=ZoneInfo(str(tzparam)))
+            else:
+                occ = occ.replace(tzinfo=timezone.utc)
+        except Exception:
+            occ = occ.replace(tzinfo=timezone.utc)
+
+    master_vevent.add("exdate", occ)
+    current_seq = int(master_vevent.get("sequence") or 0)
+    if "sequence" in master_vevent:
+        del master_vevent["sequence"]
+    master_vevent.add("sequence", current_seq + 1)
+
+    def _put_master():
+        cdav.put_event(cal_obj, _strip_method(master_cal.to_ical()))
+    _with_retry(_put_master)
+
+    # Build per-occurrence CANCEL (RECURRENCE-ID = the cancelled instance).
+    organizer = master_vevent.get("organizer")
+    organizer_email = _strip_mailto(str(organizer)) if organizer is not None else creds.email
+    organizer_name = creds.display_name
+    try:
+        if organizer is not None and organizer.params.get("CN"):
+            organizer_name = str(organizer.params.get("CN"))
+    except AttributeError:
+        pass
+
+    attendees_for_cancel: List[Attendee] = []
+    raw_atts = master_vevent.get("attendee")
+    if raw_atts is None:
+        atts: List = []
+    elif isinstance(raw_atts, list):
+        atts = raw_atts
+    else:
+        atts = [raw_atts]
+    for a in atts:
+        email = _strip_mailto(str(a))
+        if email.lower() == organizer_email.lower():
+            continue
+        name = None
+        try:
+            cn = a.params.get("CN")
+            if cn:
+                name = str(cn)
+        except AttributeError:
+            pass
+        attendees_for_cancel.append(Attendee(email=email, name=name))
+
+    summary = str(master_vevent.get("summary") or "")
+    dtend_master = master_vevent.get("dtend")
+    duration = timedelta(hours=1)
+    if dtend_master is not None and master_vevent.get("dtstart") is not None:
+        try:
+            duration = _to_aware(dtend_master.dt) - _to_aware(master_vevent.get("dtstart").dt)
+        except Exception:
+            duration = timedelta(hours=1)
+    occ_end = occ + duration
+    tz_name = "UTC"
+    try:
+        tzparam = master_vevent.get("dtstart").params.get("TZID")
+        if tzparam:
+            tz_name = str(tzparam)
+    except AttributeError:
+        pass
+
+    # Build a one-shot CANCEL ICS manually so we can include RECURRENCE-ID.
+    cancel_cal = ICalendar()
+    cancel_cal.add("prodid", "-//calinvite//pulseproof.app//EN")
+    cancel_cal.add("version", "2.0")
+    cancel_cal.add("calscale", "GREGORIAN")
+    cancel_cal.add("method", "CANCEL")
+    from icalendar import Event as _IEvent, vCalAddress, vText
+    inst = _IEvent()
+    inst.add("uid", event_uid)
+    inst.add("dtstamp", datetime.utcnow())
+    inst.add("dtstart", occ)
+    inst.add("dtend", occ_end)
+    inst.add("summary", summary)
+    inst.add("sequence", current_seq + 1)
+    inst.add("status", "CANCELLED")
+    inst.add("recurrence-id", occ)
+    org_addr = vCalAddress(f"mailto:{organizer_email}")
+    org_addr.params["CN"] = vText(organizer_name)
+    inst["organizer"] = org_addr
+    for a in attendees_for_cancel:
+        addr = vCalAddress(f"mailto:{a.email}")
+        if a.name:
+            addr.params["CN"] = vText(a.name)
+        addr.params["ROLE"] = vText("REQ-PARTICIPANT")
+        addr.params["PARTSTAT"] = vText("NEEDS-ACTION")
+        addr.params["RSVP"] = vText("FALSE")
+        addr.params["CUTYPE"] = vText("INDIVIDUAL")
+        inst.add("attendee", addr, encode=0)
+    cancel_cal.add_component(inst)
+    ics_bytes = cancel_cal.to_ical()
+
+    # Build a spec just for the email path.
+    fake_spec = EventSpec(
+        summary=summary,
+        start=occ,
+        end=occ_end,
+        organizer_email=organizer_email,
+        organizer_name=organizer_name,
+        attendees=attendees_for_cancel,
+        sequence=current_seq + 1,
+        tz=tz_name,
+        uid=event_uid,
+    )
+    body = _default_body(fake_spec, "This occurrence has been cancelled.")
+    try:
+        _send_invite(creds, fake_spec, body, ics_bytes, method="CANCEL")
+    except Exception as e:
+        # Email failure shouldn't roll back the EXDATE that's already persisted.
+        print(f"[cancel_occurrence] email failed for {event_uid} @ {occ}: {e}")
+
+    try:
+        cancel_for_occurrence(user_id, event_uid, occ)
+    except Exception as e:
+        print(f"[cancel_occurrence] reminder delete failed: {e}")
 
 
 def poll_rsvps(creds: MailboxCreds, inp: RsvpPollIn) -> RsvpPollOut:

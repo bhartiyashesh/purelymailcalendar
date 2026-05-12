@@ -322,10 +322,11 @@ export function WeekView({ anchorDate, events, onCreateAt, onEdit, onMove, daysC
               {eventsByDay[di].map(({ ev, topPx, heightPx, lane, laneCount }) => {
                 const widthPct = 100 / laneCount;
                 const leftPct = lane * widthPct;
-                const isDragging = drag?.kind === "event" && drag.event.uid === ev.uid;
+                const evKey = ev.occurrence_id || ev.uid;
+                const isDragging = drag?.kind === "event" && (drag.event.occurrence_id || drag.event.uid) === evKey;
                 return (
                   <button
-                    key={ev.uid}
+                    key={evKey}
                     data-event
                     onPointerDown={(e) => onEventPointerDown(e, ev)}
                     onClick={(e) => {
@@ -342,9 +343,12 @@ export function WeekView({ anchorDate, events, onCreateAt, onEdit, onMove, daysC
                       left: `${leftPct}%`,
                       width: `calc(${widthPct}% - 2px)`,
                     }}
-                    title={ev.summary}
+                    title={ev.recurrence ? `${ev.summary} (${ev.recurrence.text})` : ev.summary}
                   >
-                    <div className="truncate">{ev.summary || "(untitled)"}</div>
+                    <div className="truncate">
+                      {ev.recurrence && <span aria-hidden="true">↻ </span>}
+                      {ev.summary || "(untitled)"}
+                    </div>
                     <div className="opacity-70">{fmtTimeShort(new Date(ev.start))}</div>
                   </button>
                 );
