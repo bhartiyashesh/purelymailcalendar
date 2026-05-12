@@ -25,7 +25,18 @@ export function EventCard({ event, onEdit, onCancel }: Props) {
           <div className="text-xs font-medium uppercase tracking-wide text-ink-500">
             {fmtRange(event.start, event.end, event.tz)}
           </div>
-          <div className="truncate text-base font-semibold text-ink-900">{event.summary || "(no title)"}</div>
+          <div className="flex items-center gap-1.5 truncate text-base font-semibold text-ink-900">
+            {event.summary || "(no title)"}
+            {event.recurrence && (
+              <span
+                title={event.recurrence.text || "Repeats"}
+                aria-label="Recurring event"
+                className="inline-flex shrink-0 items-center rounded-full bg-accent-50 px-1.5 py-0.5 text-[10px] font-medium text-accent-700"
+              >
+                ↻ {event.recurrence.text}
+              </span>
+            )}
+          </div>
           {event.location && (
             <div className="truncate text-xs text-ink-500">{event.location}</div>
           )}

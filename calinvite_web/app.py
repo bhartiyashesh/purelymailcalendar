@@ -42,6 +42,27 @@ app.add_middleware(
 @app.on_event("startup")
 def _startup() -> None:
     Base.metadata.create_all(bind=engine)
+    # Idempotent column additions for ScheduledReminder. Postgres-flavored
+    # SQL; on SQLite (dev) we skip silently because IF NOT EXISTS isn't
+    # supported and the dev DB is normally fresh.
+    from sqlalchemy import text
+
+    dialect = engine.dialect.name
+    if dialect != "postgresql":
+        return
+    stmts = [
+        "ALTER TABLE scheduled_reminders ADD COLUMN IF NOT EXISTS occurrence_start TIMESTAMP",
+        "ALTER TABLE scheduled_reminders ADD COLUMN IF NOT EXISTS confirm_token VARCHAR(64)",
+        "ALTER TABLE scheduled_reminders ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMP",
+        "ALTER TABLE scheduled_reminders ADD COLUMN IF NOT EXISTS declined_at TIMESTAMP",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ix_scheduled_reminders_confirm_token ON scheduled_reminders (confirm_token)",
+    ]
+    with engine.begin() as conn:
+        for s in stmts:
+            try:
+                conn.execute(text(s))
+            except Exception as e:  # pragma: no cover - best-effort migration
+                print(f"[startup] migration step skipped: {s} -> {e}")
 
 
 app.include_router(auth_router)

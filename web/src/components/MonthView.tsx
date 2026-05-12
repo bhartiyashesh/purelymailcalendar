@@ -161,7 +161,7 @@ export function MonthView({ anchorDate, events, onCreateAt, onEdit, onMove }: Pr
                     : "bg-accent-50 text-accent-700 ring-accent-200";
                   return (
                     <button
-                      key={ev.uid}
+                      key={ev.occurrence_id || ev.uid}
                       onPointerDown={(e) => startDrag(e, ev)}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -172,6 +172,7 @@ export function MonthView({ anchorDate, events, onCreateAt, onEdit, onMove }: Pr
                       title={`${ev.summary} - ${fmtTimeShort(start)}`}
                     >
                       <span className="opacity-70">{fmtTimeShort(start)}</span>{" "}
+                      {ev.recurrence && <span aria-hidden="true">↻ </span>}
                       <span className="truncate">{ev.summary || "(untitled)"}</span>
                     </button>
                   );

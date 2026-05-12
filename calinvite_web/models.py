@@ -65,12 +65,17 @@ class MagicToken(Base):
 
 
 class ScheduledReminder(Base):
-    """One scheduled email reminder for an event.
+    """One scheduled email reminder for a single event occurrence.
 
     Rows are inserted by services.create_event/update_event when an event has
-    an EMAIL VALARM. A periodic /api/reminders/tick endpoint scans for rows
-    whose fire_at has passed and sent_at is null, then sends the email via
-    the owning user's mailbox SMTP.
+    an EMAIL VALARM. For recurring events one row is written per occurrence
+    (within a forward-looking expansion window). A periodic
+    /api/reminders/tick endpoint scans for rows whose fire_at has passed and
+    sent_at is null, then sends the email via the owning user's mailbox SMTP.
+
+    Each row carries a `confirm_token` that gives access to a public
+    /api/reminders/confirm endpoint where the organizer can confirm or
+    cancel just this occurrence.
     """
     __tablename__ = "scheduled_reminders"
 
@@ -79,6 +84,9 @@ class ScheduledReminder(Base):
     event_uid: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     event_summary: Mapped[str] = mapped_column(String(500), nullable=False)
     event_start: Mapped[datetime] = mapped_column(DateTime(), nullable=False)
+    # For recurring events, this is the specific occurrence's start time.
+    # For one-off events it equals `event_start`. Stored as naive UTC.
+    occurrence_start: Mapped[Optional[datetime]] = mapped_column(DateTime(), nullable=True)
     fire_at: Mapped[datetime] = mapped_column(DateTime(), index=True, nullable=False)
     minutes_before: Mapped[int] = mapped_column(Integer, nullable=False)
     recipients_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
@@ -86,6 +94,9 @@ class ScheduledReminder(Base):
     sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(), nullable=True)
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    confirm_token: Mapped[Optional[str]] = mapped_column(String(64), unique=True, index=True, nullable=True)
+    confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(), nullable=True)
+    declined_at: Mapped[Optional[datetime]] = mapped_column(DateTime(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(), default=_utcnow, nullable=False)
 
 

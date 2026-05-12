@@ -3,11 +3,11 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Iterable, List, Tuple
+from datetime import date, datetime, timedelta
+from typing import Iterable, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
-from icalendar import Alarm as ICalAlarm, Calendar, Event, Timezone, TimezoneStandard, TimezoneDaylight, vCalAddress, vText
+from icalendar import Alarm as ICalAlarm, Calendar, Event, Timezone, TimezoneStandard, TimezoneDaylight, vCalAddress, vText, vRecur
 
 
 @dataclass
@@ -36,6 +36,16 @@ class Alarm:
 
 
 @dataclass
+class Recurrence:
+    """Simple RRULE-shaped recurrence. `until` and `count` are mutually
+    exclusive; `until` is treated as end-of-day in the event's timezone."""
+    freq: str  # DAILY | WEEKLY | MONTHLY | YEARLY
+    interval: int = 1
+    until: Optional[date] = None
+    count: Optional[int] = None
+
+
+@dataclass
 class EventSpec:
     summary: str
     start: datetime
@@ -50,6 +60,10 @@ class EventSpec:
     tz: str = "America/Chicago"
     prodid: str = "-//calinvite//pulseproof.app//EN"
     alarms: List[Alarm] = field(default_factory=list)
+    recurrence: Optional[Recurrence] = None
+    # EXDATEs (cancelled occurrences) — preserved when re-PUTting an existing
+    # series so previously cancelled instances stay cancelled.
+    exdates: List[datetime] = field(default_factory=list)
 
 
 def _vtimezone(tz_name: str) -> Timezone:
@@ -109,6 +123,23 @@ def _make_event(spec: EventSpec, status: str = "CONFIRMED") -> Tuple[Calendar, E
     ev.add("sequence", spec.sequence)
     ev.add("status", status)
     ev.add("transp", "OPAQUE")
+
+    if spec.recurrence is not None:
+        rec = spec.recurrence
+        rule: dict = {"FREQ": rec.freq.upper(), "INTERVAL": int(rec.interval or 1)}
+        if rec.until is not None:
+            # UNTIL must be UTC per RFC 5545 when DTSTART is tz-aware. We treat
+            # the user-supplied date as end-of-day in the event timezone, then
+            # convert to UTC.
+            tz = ZoneInfo(spec.tz)
+            until_local = datetime(rec.until.year, rec.until.month, rec.until.day, 23, 59, 59, tzinfo=tz)
+            rule["UNTIL"] = until_local.astimezone(ZoneInfo("UTC"))
+        elif rec.count is not None:
+            rule["COUNT"] = int(rec.count)
+        ev.add("rrule", vRecur(rule))
+
+    for exd in spec.exdates:
+        ev.add("exdate", exd)
 
     org = vCalAddress(f"mailto:{spec.organizer_email}")
     org.params["CN"] = vText(spec.organizer_name)

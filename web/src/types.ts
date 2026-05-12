@@ -38,6 +38,23 @@ export type ReminderOut = {
   description?: string;
 };
 
+export type RecurrenceFreq = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
+
+export type RecurrenceIn = {
+  freq: RecurrenceFreq;
+  interval?: number;
+  until?: string;  // YYYY-MM-DD
+  count?: number;
+};
+
+export type RecurrenceOut = {
+  freq: RecurrenceFreq;
+  interval: number;
+  until?: string | null;
+  count?: number | null;
+  text: string;
+};
+
 export type EventOut = {
   uid: string;
   summary: string;
@@ -50,6 +67,9 @@ export type EventOut = {
   reminders?: ReminderOut[];
   organizer?: OrganizerOut | null;
   attendees: AttendeeOut[];
+  recurrence?: RecurrenceOut | null;
+  occurrence_id?: string;
+  master_uid?: string;
 };
 
 export type ReminderIn = {
@@ -71,6 +91,7 @@ export type EventIn = {
   description?: string;
   attendees: AttendeeIn[];
   reminders?: ReminderIn[];
+  recurrence?: RecurrenceIn | null;
   dry_run?: boolean;
   uid?: string;
   sequence?: number;
