@@ -131,6 +131,7 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
   const [calAnchor, setCalAnchor] = useState<Date>(() => startOfDay(new Date()));
   const [form, setForm] = useState<FormState>({ open: false });
   const [cancelChoice, setCancelChoice] = useState<EventOut | null>(null);
+  const [syncingInvites, setSyncingInvites] = useState(false);
 
   // Compute the CalDAV fetch range from the active tab + view state, so the
   // server only returns events that are actually visible. Calendar tab uses
@@ -231,6 +232,34 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
       setEventsLoading(false);
     }
   }, [calendar, days, fetchRange, handle]);
+
+  const onSyncInvites = useCallback(async () => {
+    if (syncingInvites) return;
+    setSyncingInvites(true);
+    try {
+      const out = await handle(() =>
+        api.syncInvites({ calendar: calendar || undefined })
+      );
+      if (!out) return;
+      const c = out.counts;
+      const total = c.created + c.updated + c.cancelled;
+      if (total === 0 && c.error === 0) {
+        pushToast("success", "No new invites to sync.");
+      } else {
+        const parts: string[] = [];
+        if (c.created) parts.push(`${c.created} added`);
+        if (c.updated) parts.push(`${c.updated} updated`);
+        if (c.cancelled) parts.push(`${c.cancelled} cancelled`);
+        if (c.error) parts.push(`${c.error} failed`);
+        pushToast(c.error > 0 ? "error" : "success", `Synced: ${parts.join(", ")}.`);
+      }
+      refreshEvents();
+    } catch (e: any) {
+      pushToast("error", e?.message || "invite sync failed");
+    } finally {
+      setSyncingInvites(false);
+    }
+  }, [calendar, handle, pushToast, refreshEvents, syncingInvites]);
 
   useEffect(() => {
     (async () => {
@@ -437,6 +466,8 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
         eventCounts={eventCounts}
         onNew={onCreateClick}
         onLogout={onSignOut}
+        onSyncInvites={onSyncInvites}
+        syncingInvites={syncingInvites}
       />
 
       <div className="mx-auto max-w-6xl px-4">

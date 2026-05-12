@@ -207,6 +207,32 @@ def post_rsvps(body: RsvpPollIn, user: User = Depends(current_user)):
         raise HTTPException(status_code=502, detail=f"upstream error: {e}")
 
 
+@app.post("/api/invites/sync")
+def sync_invites_endpoint(
+    body: dict | None = None,
+    user: User = Depends(current_user),
+):
+    """Scan the inbox for incoming iTIP REQUEST / CANCEL .ics attachments
+    and write them to the user's CalDAV calendar. Body (all optional):
+    {"calendar": str, "mailbox": str = "INBOX", "only_unseen": bool = true,
+     "mark_seen": bool = true}.
+    """
+    creds = _creds(user)
+    body = body or {}
+    try:
+        return services.sync_invites(
+            creds,
+            body.get("calendar"),
+            mailbox=body.get("mailbox") or "INBOX",
+            only_unseen=bool(body.get("only_unseen", True)),
+            mark_seen=bool(body.get("mark_seen", True)),
+        )
+    except (RuntimeError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"upstream error: {e}")
+
+
 _static_dir = Path(__file__).resolve().parent.parent / "web" / "dist"
 if _static_dir.is_dir():
     app.mount("/assets", StaticFiles(directory=_static_dir / "assets"), name="assets")

@@ -9,9 +9,11 @@ type Props = {
   eventCounts?: Record<string, number>;
   onNew: () => void;
   onLogout: () => void;
+  onSyncInvites?: () => void;
+  syncingInvites?: boolean;
 };
 
-export function Header({ me, calendars, calendar, setCalendar, eventCounts = {}, onNew, onLogout }: Props) {
+export function Header({ me, calendars, calendar, setCalendar, eventCounts = {}, onNew, onLogout, onSyncInvites, syncingInvites }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -62,6 +64,16 @@ export function Header({ me, calendars, calendar, setCalendar, eventCounts = {},
               })}
             </select>
           </div>
+          {onSyncInvites && (
+            <button
+              onClick={onSyncInvites}
+              disabled={!!syncingInvites}
+              className="btn-secondary"
+              title="Pull new invites from your inbox into the calendar"
+            >
+              {syncingInvites ? "Syncing..." : "Sync invites"}
+            </button>
+          )}
           <button onClick={onNew} className="btn-primary">+ New event</button>
           <div ref={menuRef} className="relative">
             <button

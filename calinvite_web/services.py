@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 from icalendar import Calendar as ICalendar
 
 from calinvite import caldav_client as cdav
+from calinvite import inbound_invites as invites_mod
 from calinvite import mailer
 from calinvite import rsvp as rsvp_mod
 from calinvite.ics import Alarm, Attendee, EventSpec, Recurrence, build_cancel, build_request
@@ -725,6 +726,46 @@ def cancel_occurrence(user_id: int, event_uid: str, occurrence_start: datetime) 
         cancel_for_occurrence(user_id, event_uid, occ)
     except Exception as e:
         print(f"[cancel_occurrence] reminder delete failed: {e}")
+
+
+def sync_invites(
+    creds: MailboxCreds,
+    calendar_name: Optional[str],
+    *,
+    mailbox: str = "INBOX",
+    only_unseen: bool = True,
+    mark_seen: bool = True,
+) -> dict:
+    """Pull METHOD:REQUEST / METHOD:CANCEL .ics attachments from IMAP and
+    apply them to the user's CalDAV calendar."""
+
+    def _do_caldav():
+        client = cdav.connect(creds.caldav_url, creds.email, creds.password)
+        return cdav.get_calendar(client, calendar_name)
+
+    calendar = _with_retry(_do_caldav)
+    results = invites_mod.sync_inbox_invites(
+        imap_host=creds.imap_host,
+        imap_port=creds.imap_port,
+        imap_user=creds.email,
+        imap_pass=creds.password,
+        caldav_calendar=calendar,
+        mailbox=mailbox,
+        only_unseen=only_unseen,
+        mark_seen=mark_seen,
+    )
+    counts = {"created": 0, "updated": 0, "cancelled": 0, "skipped": 0, "error": 0}
+    items = []
+    for r in results:
+        counts[r.action] = counts.get(r.action, 0) + 1
+        items.append({
+            "uid": r.uid,
+            "summary": r.summary,
+            "action": r.action,
+            "success": r.success,
+            "detail": r.detail,
+        })
+    return {"mailbox": mailbox, "counts": counts, "results": items}
 
 
 def poll_rsvps(creds: MailboxCreds, inp: RsvpPollIn) -> RsvpPollOut:
