@@ -168,6 +168,34 @@ def cancel_event(uid: str, body: EventIn, user: User = Depends(current_user)):
         raise HTTPException(status_code=502, detail=f"upstream error: {e}")
 
 
+@app.post("/api/events/{uid}/cancel-occurrence")
+def cancel_event_occurrence(
+    uid: str,
+    body: dict,
+    user: User = Depends(current_user),
+):
+    """Cancel a single occurrence of a recurring event (adds EXDATE on master,
+    sends iTIP CANCEL with RECURRENCE-ID). Body: {"occurrence_start": ISO-8601}."""
+    from datetime import datetime, timezone
+
+    raw = (body or {}).get("occurrence_start")
+    if not raw:
+        raise HTTPException(status_code=400, detail="occurrence_start is required")
+    try:
+        occ = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        if occ.tzinfo is None:
+            occ = occ.replace(tzinfo=timezone.utc)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"invalid occurrence_start: {e}")
+    try:
+        services.cancel_occurrence(user_id=user.id, event_uid=uid, occurrence_start=occ)
+        return {"ok": True}
+    except (RuntimeError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"upstream error: {e}")
+
+
 @app.post("/api/rsvps/poll", response_model=RsvpPollOut)
 def post_rsvps(body: RsvpPollIn, user: User = Depends(current_user)):
     creds = _creds(user)

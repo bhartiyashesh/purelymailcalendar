@@ -94,6 +94,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  cancelOccurrence: (uid: string, occurrenceStartIso: string) =>
+    request<{ ok: boolean }>(`/api/events/${encodeURIComponent(uid)}/cancel-occurrence`, {
+      method: "POST",
+      body: JSON.stringify({ occurrence_start: occurrenceStartIso }),
+    }),
   pollRsvps: (body: RsvpPollIn) =>
     request<RsvpPollOut>("/api/rsvps/poll", {
       method: "POST",
