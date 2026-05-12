@@ -339,7 +339,17 @@ def tick_endpoint(authorization: Optional[str] = Header(default=None)):
     expected = f"Bearer {secret}"
     if authorization != expected:
         raise HTTPException(status_code=401, detail="unauthorized")
-    return tick_due()
+    reminders = tick_due()
+    # Piggyback: every reminder tick also auto-syncs inbox invites for all
+    # users so newly-arrived invitations show up on the calendar without
+    # any user action. Failure here doesn't roll back the reminder sends.
+    try:
+        from . import services  # local import to avoid import-time cycle
+        invites = services.auto_sync_all_users_invites()
+    except Exception as e:
+        print(f"[tick] invite auto-sync failed: {e}")
+        invites = {"users_synced": 0, "users_failed": 0, "totals": {}}
+    return {"reminders": reminders, "invites": invites}
 
 
 # ---- Confirmation pages -----------------------------------------------------

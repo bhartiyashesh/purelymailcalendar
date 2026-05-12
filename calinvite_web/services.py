@@ -775,6 +775,83 @@ def sync_invites(
     return {"mailbox": mailbox, "counts": counts, "results": items}
 
 
+def _pick_target_calendar(client, preferred: Optional[str]) -> Optional[str]:
+    """Pick which calendar to PUT new invites onto for a user. If they have
+    a saved preference (mailbox.selected_calendar) and it still exists, use
+    it. Otherwise pick the calendar with the most events (heuristic that
+    avoids dumping into an empty `Default` calendar)."""
+    names = cdav.list_calendars(client)
+    if not names:
+        return None
+    if preferred and preferred in names:
+        return preferred
+    # Heuristic: most events wins. Cheap PROPFIND-equivalent via the lib.
+    best_name = names[0]
+    best_count = -1
+    for n in names:
+        try:
+            cal = cdav.get_calendar(client, n)
+            count = len(list(cal.events()))
+            if count > best_count:
+                best_count = count
+                best_name = n
+        except Exception:
+            continue
+    return best_name
+
+
+def auto_sync_all_users_invites() -> dict:
+    """Run invite sync for every user with a configured mailbox. Used by the
+    5-min Railway cron alongside the reminder tick so new invites land on
+    the calendar without any user action."""
+    from .db import SessionLocal as _SL
+    from .models import Mailbox as _Mailbox, User as _User
+
+    aggregate = {
+        "users_synced": 0,
+        "users_failed": 0,
+        "totals": {"created": 0, "updated": 0, "cancelled": 0, "skipped": 0, "error": 0},
+    }
+    with _SL() as db:
+        # Snapshot what we need into plain dicts so we don't hit the DB while
+        # iterating (IMAP/CalDAV calls below take seconds).
+        snapshot = []
+        rows = (
+            db.query(_Mailbox)
+            .all()
+        )
+        for mb in rows:
+            snapshot.append({
+                "user_id": mb.user_id,
+                "mailbox": mb,
+            })
+            # Force-load lazy fields by touching them.
+            _ = (mb.email, mb.smtp_host, mb.imap_host, mb.account_id, mb.encrypted_password)
+
+    for s in snapshot:
+        mb = s["mailbox"]
+        try:
+            creds = creds_for(mb)
+            def _pick():
+                client = cdav.connect(creds.caldav_url, creds.email, creds.password)
+                return _pick_target_calendar(client, getattr(mb, "selected_calendar", None))
+            target = _with_retry(_pick)
+            out = sync_invites(
+                creds,
+                target,
+                only_unseen=False,
+                mark_seen=False,
+                since_days=30,
+            )
+            for k in aggregate["totals"]:
+                aggregate["totals"][k] += out["counts"].get(k, 0)
+            aggregate["users_synced"] += 1
+        except Exception as e:
+            aggregate["users_failed"] += 1
+            print(f"[auto_sync_invites] user {s['user_id']} failed: {e}")
+    return aggregate
+
+
 def poll_rsvps(creds: MailboxCreds, inp: RsvpPollIn) -> RsvpPollOut:
     def _do_caldav():
         client = cdav.connect(creds.caldav_url, creds.email, creds.password)

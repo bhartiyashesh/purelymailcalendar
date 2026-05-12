@@ -69,7 +69,7 @@ export function Header({ me, calendars, calendar, setCalendar, eventCounts = {},
               onClick={onSyncInvites}
               disabled={!!syncingInvites}
               className="btn-secondary"
-              title="Pull new invites from your inbox into the calendar"
+              title="Inbox invites auto-sync every 5 minutes. Click to sync now."
             >
               {syncingInvites ? "Syncing..." : "Sync invites"}
             </button>
