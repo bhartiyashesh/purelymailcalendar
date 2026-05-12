@@ -35,7 +35,15 @@ export function LoginView() {
             <p className="text-sm text-ink-600">
               A sign-in link is on its way to <span className="font-medium text-ink-800">{email}</span>. It expires in 15 minutes.
             </p>
-            <button onClick={() => setSent(false)} className="btn-secondary mt-4">Use a different email</button>
+            <a
+              href="https://inbox.purelymail.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary mt-4 inline-flex w-full items-center justify-center"
+            >
+              Go to webmail
+            </a>
+            <button onClick={() => setSent(false)} className="btn-secondary mt-2 w-full">Use a different email</button>
           </div>
         ) : (
           <form onSubmit={submit}>
