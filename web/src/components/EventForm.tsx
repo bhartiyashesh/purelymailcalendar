@@ -1,6 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
-import type { EventIn, EventOut } from "../types";
+import type { EventIn, EventOut, ReminderIn } from "../types";
 import { toLocalIsoMinute } from "../util";
+
+type ReminderRow = {
+  popup: boolean;
+  email: boolean;
+  allAttendees: boolean;
+  amount: number;
+  unit: "minutes" | "hours" | "days";
+  recipients: string;
+};
+
+const REMINDER_UNIT_MIN = { minutes: 1, hours: 60, days: 60 * 24 } as const;
+
+function toMinutes(r: ReminderRow): number {
+  return Math.max(0, Math.round(r.amount * REMINDER_UNIT_MIN[r.unit]));
+}
+
+function fromMinutes(n: number): { amount: number; unit: ReminderRow["unit"] } {
+  if (n % (60 * 24) === 0 && n >= 60 * 24) return { amount: n / (60 * 24), unit: "days" };
+  if (n % 60 === 0 && n >= 60) return { amount: n / 60, unit: "hours" };
+  return { amount: n, unit: "minutes" };
+}
 
 const COMMON_TZS = [
   "America/Chicago",
@@ -46,6 +67,17 @@ function defaultStart(): string {
   return toLocalIsoMinute(d);
 }
 
+// Snap a `YYYY-MM-DDTHH:MM` local-iso string DOWN to the nearest 5-min slot.
+// Keeps the reminder scheduler (5-min Railway cron tick) aligned with what
+// the user actually sees in the form.
+function snapToFive(local: string): string {
+  const m = local.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+  if (!m) return local;
+  const [, y, mo, d, hh, mm] = m;
+  const snapped = String(Math.floor(parseInt(mm, 10) / 5) * 5).padStart(2, "0");
+  return `${y}-${mo}-${d}T${hh}:${snapped}`;
+}
+
 function durationFrom(initial?: EventOut | null): number {
   if (!initial) return 60;
   const ms = new Date(initial.end).getTime() - new Date(initial.start).getTime();
@@ -59,7 +91,9 @@ function localFromIso(iso: string): string {
 export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes, defaultAccount, defaultCalendar, onClose, onSubmit }: Props) {
   const [summary, setSummary] = useState(initial?.summary || "");
   const [start, setStart] = useState(
-    initial ? localFromIso(initial.start) : prefillStart ? toLocalIsoMinute(prefillStart) : defaultStart()
+    snapToFive(
+      initial ? localFromIso(initial.start) : prefillStart ? toLocalIsoMinute(prefillStart) : defaultStart()
+    )
   );
   const [duration, setDuration] = useState(
     initial ? durationFrom(initial) : prefillDurationMinutes ?? 60
@@ -69,6 +103,9 @@ export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes,
   const [location, setLocation] = useState(initial?.location || "");
   const [description, setDescription] = useState(initial?.description || "");
   const [attendees, setAttendees] = useState<AttRow[]>(attendeesFrom(initial));
+  const [reminders, setReminders] = useState<ReminderRow[]>(
+    initial ? [] : [{ popup: true, email: false, allAttendees: true, amount: 15, unit: "minutes", recipients: "" }]
+  );
   const [dryRun, setDryRun] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -102,11 +139,22 @@ export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes,
       setErr("Start time is required");
       return;
     }
+    // Snap event start time DOWN to the nearest 5-min slot so reminder fire
+    // times align with our 5-min Railway cron tick.
+    const snappedStart = (() => {
+      const m = start.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+      if (!m) return start;
+      const [, y, mo, d, hh, mm] = m;
+      const minutes = parseInt(mm, 10);
+      const snapped = String(Math.floor(minutes / 5) * 5).padStart(2, "0");
+      return `${y}-${mo}-${d}T${hh}:${snapped}`;
+    })();
+
     const body: EventIn = {
       account: defaultAccount || undefined,
       calendar: defaultCalendar || undefined,
       summary: summary.trim(),
-      start,
+      start: snappedStart,
       duration_minutes: duration,
       tz,
       location: location.trim(),
@@ -114,6 +162,25 @@ export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes,
       attendees: attendees
         .map((r) => ({ email: r.email.trim(), name: r.name.trim() || undefined }))
         .filter((r) => !!r.email),
+      reminders: reminders.flatMap<ReminderIn>((r) => {
+        const out: ReminderIn[] = [];
+        const minutes_before = toMinutes(r);
+        if (r.popup) {
+          out.push({ action: "DISPLAY", minutes_before, recipients: [] });
+        }
+        if (r.email) {
+          const attendeeEmails = attendees
+            .map((a) => a.email.trim())
+            .filter(Boolean);
+          const typed = r.recipients
+            .split(/[,\s]+/)
+            .map((x) => x.trim())
+            .filter(Boolean);
+          const recipients = r.allAttendees ? attendeeEmails : typed;
+          out.push({ action: "EMAIL", minutes_before, recipients });
+        }
+        return out;
+      }),
       dry_run: dryRun,
       uid: initial?.uid,
       sequence: initial?.sequence,
@@ -160,9 +227,13 @@ export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes,
                 <input
                   type="datetime-local"
                   className="field"
+                  step={300}
                   value={start}
-                  onChange={(e) => setStart(e.target.value)}
+                  onChange={(e) => setStart(snapToFive(e.target.value))}
                 />
+                <p className="mt-1 text-xs text-ink-500">
+                  Snaps to 5-minute slots (e.g. 11:13 becomes 11:10).
+                </p>
               </div>
               <div className="col-span-3">
                 <label className="label">Duration (min)</label>
@@ -233,6 +304,164 @@ export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes,
                     >
                       ×
                     </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <label className="label mb-0">Reminders</label>
+                <button
+                  type="button"
+                  className="text-xs font-medium text-accent-600 hover:text-accent-700"
+                  onClick={() =>
+                    setReminders((rows) => [
+                      ...rows,
+                      { popup: true, email: false, allAttendees: true, amount: 15, unit: "minutes", recipients: "" },
+                    ])
+                  }
+                >
+                  + add
+                </button>
+              </div>
+              <p className="mb-2 text-xs text-ink-500">
+                Popup reminders fire on each attendee's calendar app automatically.
+                Email reminders are sent by our scheduler at the right moment to the recipients you list.
+                Minute-level offsets snap to multiples of 5 to match our 5-minute scheduler tick.
+              </p>
+              <div className="flex flex-col gap-2">
+                {reminders.length === 0 && (
+                  <div className="text-xs text-ink-500">No reminders. Click "+ add" to set one.</div>
+                )}
+                {reminders.map((row, i) => (
+                  <div key={i} className="rounded-md border border-ink-200 bg-white p-2">
+                    <div className="grid grid-cols-12 items-center gap-2">
+                      <div className="col-span-4 flex items-center gap-3 text-sm text-ink-700">
+                        <label className="inline-flex items-center gap-1">
+                          <input
+                            type="checkbox"
+                            checked={row.popup}
+                            onChange={(e) =>
+                              setReminders((rows) =>
+                                rows.map((r, idx) => (idx === i ? { ...r, popup: e.target.checked } : r))
+                              )
+                            }
+                            className="h-4 w-4 rounded border-ink-300 text-accent-600 focus:ring-accent-500"
+                          />
+                          Popup
+                        </label>
+                        <label className="inline-flex items-center gap-1">
+                          <input
+                            type="checkbox"
+                            checked={row.email}
+                            onChange={(e) =>
+                              setReminders((rows) =>
+                                rows.map((r, idx) => (idx === i ? { ...r, email: e.target.checked } : r))
+                              )
+                            }
+                            className="h-4 w-4 rounded border-ink-300 text-accent-600 focus:ring-accent-500"
+                          />
+                          Email
+                        </label>
+                      </div>
+                      <input
+                        type="number"
+                        min={0}
+                        step={row.unit === "minutes" ? 5 : 1}
+                        className="field col-span-2"
+                        value={row.amount}
+                        onChange={(e) =>
+                          setReminders((rows) =>
+                            rows.map((r, idx) => {
+                              if (idx !== i) return r;
+                              const raw = Math.max(0, Number(e.target.value) || 0);
+                              // For minute reminders, snap DOWN to a multiple
+                              // of 5 so the email tick (5-min cron) can fire.
+                              const snapped = r.unit === "minutes" ? Math.floor(raw / 5) * 5 : raw;
+                              return { ...r, amount: snapped };
+                            })
+                          )
+                        }
+                      />
+                      <select
+                        className="field col-span-4"
+                        value={row.unit}
+                        onChange={(e) =>
+                          setReminders((rows) =>
+                            rows.map((r, idx) => {
+                              if (idx !== i) return r;
+                              const nextUnit = e.target.value as ReminderRow["unit"];
+                              // When switching to minutes, snap current
+                              // amount down to a multiple of 5.
+                              const nextAmount =
+                                nextUnit === "minutes" ? Math.floor(r.amount / 5) * 5 : r.amount;
+                              return { ...r, unit: nextUnit, amount: nextAmount };
+                            })
+                          )
+                        }
+                      >
+                        <option value="minutes">minutes before</option>
+                        <option value="hours">hours before</option>
+                        <option value="days">days before</option>
+                      </select>
+                      <button
+                        type="button"
+                        className="btn-secondary col-span-2"
+                        onClick={() => setReminders((rows) => rows.filter((_, idx) => idx !== i))}
+                        aria-label="remove reminder"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    {row.email && (
+                      <div className="mt-3 space-y-2 rounded-md bg-ink-50 p-2">
+                        <label className="inline-flex items-center gap-2 text-sm font-medium text-ink-800">
+                          <input
+                            type="checkbox"
+                            checked={row.allAttendees}
+                            onChange={(e) =>
+                              setReminders((rows) =>
+                                rows.map((r, idx) =>
+                                  idx === i ? { ...r, allAttendees: e.target.checked } : r
+                                )
+                              )
+                            }
+                            className="h-4 w-4 rounded border-ink-300 text-accent-600 focus:ring-accent-500"
+                          />
+                          Remind all attendees
+                        </label>
+                        {row.allAttendees ? (
+                          (() => {
+                            const list = attendees
+                              .map((a) => a.email.trim())
+                              .filter(Boolean);
+                            if (list.length === 0) {
+                              return (
+                                <p className="text-xs text-ink-500">
+                                  No attendees added yet. Add attendees above to receive this reminder.
+                                </p>
+                              );
+                            }
+                            return (
+                              <p className="text-xs text-ink-600">
+                                Will email {list.length} {list.length === 1 ? "attendee" : "attendees"}: {list.join(", ")}
+                              </p>
+                            );
+                          })()
+                        ) : (
+                          <input
+                            className="field"
+                            placeholder="Recipients: organizer@you.com, person@example.com (comma separated)"
+                            value={row.recipients}
+                            onChange={(e) =>
+                              setReminders((rows) =>
+                                rows.map((r, idx) => (idx === i ? { ...r, recipients: e.target.value } : r))
+                              )
+                            }
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

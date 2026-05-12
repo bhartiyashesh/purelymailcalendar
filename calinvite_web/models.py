@@ -64,6 +64,31 @@ class MagicToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(), default=_utcnow, nullable=False)
 
 
+class ScheduledReminder(Base):
+    """One scheduled email reminder for an event.
+
+    Rows are inserted by services.create_event/update_event when an event has
+    an EMAIL VALARM. A periodic /api/reminders/tick endpoint scans for rows
+    whose fire_at has passed and sent_at is null, then sends the email via
+    the owning user's mailbox SMTP.
+    """
+    __tablename__ = "scheduled_reminders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    event_uid: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    event_summary: Mapped[str] = mapped_column(String(500), nullable=False)
+    event_start: Mapped[datetime] = mapped_column(DateTime(), nullable=False)
+    fire_at: Mapped[datetime] = mapped_column(DateTime(), index=True, nullable=False)
+    minutes_before: Mapped[int] = mapped_column(Integer, nullable=False)
+    recipients_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(), nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(), default=_utcnow, nullable=False)
+
+
 class UserSession(Base):
     """Long-lived session, keyed by random id stored in HttpOnly cookie."""
     __tablename__ = "user_sessions"

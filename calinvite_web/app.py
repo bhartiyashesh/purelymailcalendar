@@ -14,6 +14,7 @@ from . import services
 from .auth import current_user, router as auth_router
 from .db import Base, engine
 from .mailbox import router as mailbox_router
+from .reminders import router as reminders_router
 from .models import User
 from .schemas import (
     CalendarOut,
@@ -45,6 +46,7 @@ def _startup() -> None:
 
 app.include_router(auth_router)
 app.include_router(mailbox_router)
+app.include_router(reminders_router)
 
 
 def _creds(user: User) -> services.MailboxCreds:
@@ -93,7 +95,7 @@ def get_event(uid: str, calendar: Optional[str] = None, user: User = Depends(cur
 def post_event(body: EventIn, user: User = Depends(current_user)):
     creds = _creds(user)
     try:
-        return services.create_event(creds, body)
+        return services.create_event(creds, body, user_id=user.id)
     except (RuntimeError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -104,7 +106,7 @@ def post_event(body: EventIn, user: User = Depends(current_user)):
 def put_event(uid: str, body: EventIn, user: User = Depends(current_user)):
     creds = _creds(user)
     try:
-        return services.update_event(creds, uid, body)
+        return services.update_event(creds, uid, body, user_id=user.id)
     except (RuntimeError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -115,7 +117,7 @@ def put_event(uid: str, body: EventIn, user: User = Depends(current_user)):
 def cancel_event(uid: str, body: EventIn, user: User = Depends(current_user)):
     creds = _creds(user)
     try:
-        result = services.cancel_event(creds, uid, body)
+        result = services.cancel_event(creds, uid, body, user_id=user.id)
         return CancelEventResponse(uid=result.uid, sent_to=result.sent_to)
     except (RuntimeError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -140,6 +142,13 @@ if _static_dir.is_dir():
 
     @app.get("/")
     def index():
+        return FileResponse(_static_dir / "index.html")
+
+    @app.get("/about")
+    def about_page():
+        about_html = _static_dir / "about.html"
+        if about_html.is_file():
+            return FileResponse(about_html)
         return FileResponse(_static_dir / "index.html")
 
     @app.get("/{full_path:path}")

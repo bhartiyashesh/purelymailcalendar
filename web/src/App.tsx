@@ -12,6 +12,7 @@ import { OnboardingView } from "./components/OnboardingView";
 import { UnofficialNote } from "./components/UnofficialNote";
 import { ToastStack, type ToastMsg } from "./components/Toast";
 import { fmtTimeShort } from "./util";
+import { useReminders } from "./useReminders";
 
 type Tab = "calendar" | "events" | "rsvps";
 type FormState =
@@ -136,6 +137,36 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
   }, []);
   const dismissToast = useCallback((id: number) => {
     setToasts((t) => t.filter((x) => x.id !== id));
+  }, []);
+
+  // In-tab reminder scheduler. Fires a blocking fullscreen alert that the user
+  // must dismiss, plus a native browser Notification (if granted) for when the
+  // tab isn't focused.
+  const [reminderAlerts, setReminderAlerts] = useState<
+    { id: number; title: string; offsetText: string; event: EventOut }[]
+  >([]);
+  const reminderIdRef = useRef(1);
+  useReminders(events, (ev, _r, offsetText) => {
+    const id = reminderIdRef.current++;
+    setReminderAlerts((prev) => [...prev, { id, title: ev.summary, offsetText, event: ev }]);
+    const notifBody = `Starts ${offsetText} — ${new Date(ev.start).toLocaleString()}`;
+    try {
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(`Reminder: ${ev.summary}`, { body: notifBody, tag: ev.uid });
+      }
+    } catch {
+      // ignore
+    }
+    try {
+      const orig = document.title;
+      document.title = `🔔 ${ev.summary}`;
+      setTimeout(() => { document.title = orig; }, 8000);
+    } catch {
+      // ignore
+    }
+  });
+  const dismissReminder = useCallback((id: number) => {
+    setReminderAlerts((prev) => prev.filter((r) => r.id !== id));
   }, []);
 
   const handle = useCallback(
@@ -421,6 +452,82 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
       )}
 
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
+
+      {reminderAlerts.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/70 p-4">
+          {(() => {
+            const a = reminderAlerts[0];
+            return (
+              <div
+                role="alertdialog"
+                aria-modal="true"
+                aria-labelledby="reminder-title"
+                className="w-full max-w-md rounded-xl border border-ink-200 bg-white p-6 text-center shadow-2xl"
+              >
+                <div className="mb-3 flex justify-center text-accent-600">
+                  <svg
+                    aria-hidden="true"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 32 32"
+                    fill="currentColor"
+                    className="h-12 w-12"
+                  >
+                    <path d="M30,23.3818l-2-1V20a6.0046,6.0046,0,0,0-5-5.91V12H21v2.09A6.0046,6.0046,0,0,0,16,20v2.3818l-2,1V28h6v2h4V28h6ZM28,26H16V24.6182l2-1V20a4,4,0,0,1,8,0v3.6182l2,1Z" />
+                    <path d="M28,6a2,2,0,0,0-2-2H22V2H20V4H12V2H10V4H6A2,2,0,0,0,4,6V26a2,2,0,0,0,2,2h4V26H6V6h4V8h2V6h8V8h2V6h4v6h2Z" />
+                  </svg>
+                </div>
+                <h2 id="reminder-title" className="text-xl font-semibold text-ink-900">
+                  {a.title}
+                </h2>
+                <p className="mt-1 text-sm font-medium text-accent-700">Starts {a.offsetText}</p>
+                <dl className="mt-4 grid gap-2 text-left text-sm">
+                  <div>
+                    <dt className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">When</dt>
+                    <dd className="text-ink-800">
+                      {new Date(a.event.start).toLocaleString()}
+                      {a.event.tz ? ` · ${a.event.tz}` : ""}
+                    </dd>
+                  </div>
+                  {a.event.location && (
+                    <div>
+                      <dt className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">Where</dt>
+                      <dd className="break-words text-ink-800">{a.event.location}</dd>
+                    </div>
+                  )}
+                  {a.event.attendees && a.event.attendees.length > 0 && (
+                    <div>
+                      <dt className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+                        Attendees ({a.event.attendees.length})
+                      </dt>
+                      <dd className="break-words text-ink-700">
+                        {a.event.attendees.map((x) => x.email).join(", ")}
+                      </dd>
+                    </div>
+                  )}
+                  {a.event.description && (
+                    <div>
+                      <dt className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">Description</dt>
+                      <dd className="whitespace-pre-wrap text-ink-700">{a.event.description}</dd>
+                    </div>
+                  )}
+                </dl>
+                {reminderAlerts.length > 1 && (
+                  <p className="mt-3 text-xs text-ink-500">
+                    +{reminderAlerts.length - 1} more reminder{reminderAlerts.length - 1 === 1 ? "" : "s"} queued
+                  </p>
+                )}
+                <button
+                  autoFocus
+                  onClick={() => dismissReminder(a.id)}
+                  className="btn-primary mt-5 w-full"
+                >
+                  Dismiss
+                </button>
+              </div>
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 }

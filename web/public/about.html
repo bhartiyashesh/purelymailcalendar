@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#7c3aed" />
+    <meta name="robots" content="index, follow" />
+    <meta name="author" content="Yashesh Bharti" />
+
+    <title>About Purelymail Calendar — Calendar and meeting invites for Purelymail</title>
+    <meta
+      name="description"
+      content="Purelymail Calendar is a free, unofficial web app that adds full calendar views, iTIP meeting invites, and RSVP tracking to any Purelymail mailbox. Built by Yashesh Bharti."
+    />
+    <meta
+      name="keywords"
+      content="Purelymail, Purelymail calendar, Purelymail meeting invites, Purelymail CalDAV, send meeting invite from Purelymail, iTIP RSVP, calendar app for Purelymail, free Purelymail calendar"
+    />
+
+    <link rel="canonical" href="https://purelymailcalendar.com/about" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Purelymail Calendar" />
+    <meta property="og:title" content="About Purelymail Calendar" />
+    <meta
+      property="og:description"
+      content="Free, unofficial calendar and meeting-invite app for Purelymail mailboxes. By Yashesh Bharti."
+    />
+    <meta property="og:url" content="https://purelymailcalendar.com/about" />
+    <meta property="og:image" content="https://purelymailcalendar.com/logo.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="About Purelymail Calendar" />
+    <meta
+      name="twitter:description"
+      content="Free, unofficial calendar and meeting-invite app for Purelymail mailboxes. By Yashesh Bharti."
+    />
+    <meta name="twitter:image" content="https://purelymailcalendar.com/logo.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is Purelymail Calendar?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Purelymail Calendar is a free, unofficial web app that adds full calendar views, meeting invites, and RSVP tracking to any Purelymail mailbox. It uses Purelymail's CalDAV, SMTP, and IMAP servers directly so your data stays in your mailbox."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is this an official Purelymail product?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. Purelymail Calendar is unofficial and is not affiliated with, endorsed by, or sponsored by Purelymail. It is an independent project built by Yashesh Bharti."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does it work with Gmail, Apple Mail, and Outlook?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Meeting invites are sent as standard iTIP REQUEST messages with the correct MIME structure so Gmail, Apple Mail, and Outlook all render them as proper calendar invitations."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Where is my data stored?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Your calendar events live on Purelymail's CalDAV servers, not in this app's database. The app only stores your encrypted mailbox credentials (Fernet-encrypted at rest) and a user session record so you can sign in."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is it free?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Purelymail Calendar is free to use. You only pay for your underlying Purelymail mailbox subscription."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is the source code available?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. The source is on GitHub at github.com/bhartiyashesh/purelymailcalendar. Released under the MIT license."
+            }
+          }
+        ]
+      }
+    </script>
+
+    <style>
+      :root {
+        --ink-50: #f8fafc;
+        --ink-100: #f1f5f9;
+        --ink-200: #e2e8f0;
+        --ink-400: #94a3b8;
+        --ink-500: #64748b;
+        --ink-600: #475569;
+        --ink-700: #334155;
+        --ink-800: #1e293b;
+        --ink-900: #0f172a;
+        --accent-50: #f5f3ff;
+        --accent-600: #7c3aed;
+        --accent-700: #6d28d9;
+        --accent-900: #4c1d95;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: var(--accent-50);
+        color: var(--ink-800);
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+      }
+      header.site {
+        position: sticky;
+        top: 0;
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(6px);
+        border-bottom: 1px solid var(--ink-200);
+        z-index: 10;
+      }
+      header.site .inner {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      header.site a.brand {
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--ink-900);
+        text-decoration: none;
+      }
+      header.site nav {
+        margin-left: auto;
+        display: flex;
+        gap: 18px;
+      }
+      header.site nav a {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--ink-700);
+        text-decoration: none;
+      }
+      header.site nav a:hover { color: var(--accent-700); }
+      header.site nav a.cta {
+        background: var(--accent-600);
+        color: #fff;
+        padding: 6px 12px;
+        border-radius: 6px;
+      }
+      header.site nav a.cta:hover { background: var(--accent-700); }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 32px 16px 64px;
+      }
+      h1 {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--ink-900);
+        margin: 0 0 8px;
+      }
+      h2 {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--ink-900);
+        margin: 32px 0 8px;
+      }
+      h3 {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--ink-900);
+        margin: 20px 0 4px;
+      }
+      p { margin: 0 0 12px; }
+      .lede { font-size: 16px; color: var(--ink-600); margin-bottom: 24px; }
+      ul { padding-left: 20px; margin: 0 0 12px; }
+      li { margin: 4px 0; }
+      a { color: var(--accent-700); }
+      a:hover { color: var(--accent-900); }
+      code {
+        background: #fff;
+        padding: 1px 6px;
+        border: 1px solid var(--ink-200);
+        border-radius: 4px;
+        font-size: 0.9em;
+      }
+      .card {
+        background: #fff;
+        border: 1px solid var(--ink-200);
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin: 16px 0;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+        margin: 12px 0 16px;
+      }
+      .grid .card { margin: 0; }
+      footer.site {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 32px 16px 48px;
+        border-top: 1px solid var(--ink-200);
+        color: var(--ink-500);
+        font-size: 12px;
+        text-align: center;
+      }
+      footer.site a { color: var(--ink-700); }
+    </style>
+  </head>
+  <body>
+    <header class="site">
+      <div class="inner">
+        <a href="/" class="brand">Purelymail Calendar</a>
+        <nav>
+          <a href="/about">About</a>
+          <a href="https://github.com/bhartiyashesh/purelymailcalendar" rel="noopener noreferrer" target="_blank">GitHub</a>
+          <a href="/" class="cta">Sign in</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <h1>About Purelymail Calendar</h1>
+      <p class="lede">
+        Purelymail Calendar is a free, unofficial web app that adds full calendar views,
+        meeting invites, and RSVP tracking to any Purelymail mailbox.
+      </p>
+
+      <h2>Why this exists</h2>
+      <p>
+        Purelymail is a low-cost, no-nonsense email host with a great web UI. It supports CalDAV
+        for calendar storage, but it doesn't ship an iMIP or iTIP scheduler — so sending a real
+        meeting invitation that shows up correctly in Gmail, Apple Mail, and Outlook isn't
+        possible out of the box. RSVPs from attendees don't flow back into the calendar either.
+      </p>
+      <p>
+        Purelymail Calendar fills that gap. Sign in with a one-time email link, connect your
+        Purelymail mailbox once, and you get a clean calendar interface with proper iTIP
+        scheduling.
+      </p>
+
+      <h2>What you can do</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Send meeting invites</h3>
+          <p>iTIP <code>REQUEST</code> emails from your Purelymail address. Rendered as real
+          calendar invites by Gmail, Apple Mail, and Outlook.</p>
+        </div>
+        <div class="card">
+          <h3>Track RSVPs</h3>
+          <p>The IMAP poller pulls attendee replies, matches them to the event, and updates
+          each <code>PARTSTAT</code> on the underlying CalDAV record.</p>
+        </div>
+        <div class="card">
+          <h3>Month, week, day views</h3>
+          <p>Drag to move, click to create, live "now" line. Built for keyboard-and-mouse speed.</p>
+        </div>
+        <div class="card">
+          <h3>Updates and cancellations</h3>
+          <p>Bump <code>SEQUENCE</code> properly so attendees' calendars update in place.
+          Cancellation sends <code>METHOD:CANCEL</code> so the event is removed from their
+          calendars too.</p>
+        </div>
+      </div>
+
+      <h2>How sign-in works</h2>
+      <p>
+        Authentication is passwordless. You enter your email and click a one-time
+        link delivered to your inbox. After verification, you're asked once for your
+        Purelymail mailbox password. That password is encrypted at rest with Fernet
+        (AES-128-CBC + HMAC) using a server-side key, and only decrypted when the app
+        needs to talk to Purelymail's CalDAV, SMTP, or IMAP servers on your behalf.
+      </p>
+
+      <h2>Where your data lives</h2>
+      <p>
+        Your events live on Purelymail's CalDAV servers, exactly where they already
+        were. Purelymail Calendar is a thin interface layer on top — if you stop using
+        the app, your calendar is unchanged. The only data the app stores about you is
+        a user row (email, display name, timestamps), your encrypted mailbox credentials,
+        and your active session cookie.
+      </p>
+
+      <h2>Frequently asked questions</h2>
+
+      <h3>Is this an official Purelymail product?</h3>
+      <p>
+        No. Purelymail Calendar is unofficial and is not affiliated with, endorsed by,
+        or sponsored by Purelymail. It is an independent project.
+      </p>
+
+      <h3>Is it free?</h3>
+      <p>
+        Yes. You only pay for your existing Purelymail mailbox.
+      </p>
+
+      <h3>Does it work for custom domains hosted on Purelymail?</h3>
+      <p>
+        Yes. Any Purelymail mailbox works — your default <code>@purelymail.com</code> address
+        or any custom domain you have routed through Purelymail. The app auto-discovers your
+        Purelymail account ID via a PROPFIND on the WebDAV root.
+      </p>
+
+      <h3>Will my invites land in spam?</h3>
+      <p>
+        Invites are sent from your own Purelymail mailbox using your own SMTP, so deliverability
+        is determined by your domain's SPF/DKIM/DMARC setup — the same as any regular email
+        you send. The MIME structure is the same shape Apple Mail, Gmail, and Outlook use for
+        their own invites.
+      </p>
+
+      <h3>Is the source available?</h3>
+      <p>
+        Yes. Source is on GitHub at
+        <a href="https://github.com/bhartiyashesh/purelymailcalendar" rel="noopener noreferrer" target="_blank">
+          github.com/bhartiyashesh/purelymailcalendar
+        </a>. Released under the MIT license.
+      </p>
+
+      <h3>Who built this?</h3>
+      <p>
+        Yashesh Bharti — <a href="https://yasheshbharti.com" rel="noopener noreferrer" target="_blank">yasheshbharti.com</a>.
+      </p>
+
+      <h2>Ready to try it?</h2>
+      <p>
+        <a href="/" class="brand">Sign in to Purelymail Calendar →</a>
+      </p>
+    </main>
+
+    <footer class="site">
+      Purelymail Calendar is an unofficial, community-built tool. Not affiliated with,
+      endorsed by, or sponsored by Purelymail. Made by
+      <a href="https://yasheshbharti.com" rel="noopener noreferrer" target="_blank">Yashesh Bharti</a>.
+      <a href="https://github.com/bhartiyashesh/purelymailcalendar" rel="noopener noreferrer" target="_blank">Source on GitHub</a>.
+    </footer>
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-06E18161QX"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-06E18161QX');
+    </script>
+  </body>
+</html>
