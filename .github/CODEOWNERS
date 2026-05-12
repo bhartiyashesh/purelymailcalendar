@@ -1,0 +1,5 @@
+# Every PR auto-requests review from @bhartiyashesh.
+# Add more specific rules below if you split ownership later, e.g.
+#   /web/  @some-frontend-collaborator
+#   /calinvite_web/  @some-backend-collaborator
+*  @bhartiyashesh
