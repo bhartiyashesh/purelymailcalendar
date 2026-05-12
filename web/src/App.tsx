@@ -500,6 +500,10 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
           defaultCalendar={calendar}
           onClose={() => setForm({ open: false })}
           onSubmit={submitForm}
+          onCancelEvent={(ev) => {
+            setForm({ open: false });
+            onCancelClick(ev);
+          }}
         />
       )}
 

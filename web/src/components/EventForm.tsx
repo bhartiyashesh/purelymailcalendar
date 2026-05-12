@@ -96,6 +96,10 @@ type Props = {
     mode: Mode,
     uid: string | null
   ) => Promise<void>;
+  // Triggered when the user clicks "Cancel event" in edit mode. The parent
+  // owns the actual cancel flow (incl. the recurring chooser modal) so it
+  // can re-use the same logic from the EventCard path.
+  onCancelEvent?: (initial: EventOut) => void;
 };
 
 type AttRow = { email: string; name: string };
@@ -133,7 +137,7 @@ function localFromIso(iso: string): string {
   return toLocalIsoMinute(new Date(iso));
 }
 
-export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes, defaultAccount, defaultCalendar, onClose, onSubmit }: Props) {
+export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes, defaultAccount, defaultCalendar, onClose, onSubmit, onCancelEvent }: Props) {
   const [summary, setSummary] = useState(initial?.summary || "");
   const [start, setStart] = useState(
     snapToFive(
@@ -619,8 +623,19 @@ export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes,
             )}
           </div>
         </div>
-        <div className="flex items-center justify-end gap-2 border-t border-ink-200 px-5 py-3">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+        <div className="flex items-center gap-2 border-t border-ink-200 px-5 py-3">
+          {mode === "edit" && initial && onCancelEvent && (
+            <button
+              type="button"
+              className="btn-danger"
+              onClick={() => onCancelEvent(initial)}
+              disabled={busy}
+            >
+              Cancel event
+            </button>
+          )}
+          <div className="flex-1" />
+          <button type="button" className="btn-secondary" onClick={onClose}>Close</button>
           <button type="submit" disabled={busy} className="btn-primary">
             {busy ? "Sending..." : mode === "edit" ? "Save & resend" : "Create & send invite"}
           </button>
