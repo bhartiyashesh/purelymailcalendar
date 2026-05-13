@@ -58,14 +58,21 @@ jobs:
       - name: Deploy to Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        # Skips deploy automatically if no token is set, so forks don't fail.
-        if: ${{ secrets.RAILWAY_TOKEN != '' }}
+          SHA: ${{ steps.meta.outputs.sha }}
+          BUILT_AT: ${{ steps.meta.outputs.built_at }}
         run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::notice::RAILWAY_TOKEN not set; skipping Railway deploy."
+            echo "Add it under Settings → Secrets and variables → Actions to enable auto-deploy."
+            exit 0
+          fi
           curl -fsSL https://railway.com/install.sh | sh
-          # Pass the same build args so /api/version on the deployed container
-          # matches the commit that triggered this workflow.
-          export COMMIT_SHA=${{ steps.meta.outputs.sha }}
-          export BUILD_TIME=${{ steps.meta.outputs.built_at }}
+          # Push COMMIT_SHA + BUILD_TIME to the Railway service env so the
+          # running container reports the right values at /api/version,
+          # regardless of whether Railway rebuilds the image or pulls from GHCR.
+          railway variables --service web \
+            --set "COMMIT_SHA=$SHA" \
+            --set "BUILD_TIME=$BUILT_AT"
           railway up --service web --ci
 
       - name: Summary
