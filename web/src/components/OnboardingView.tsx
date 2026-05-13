@@ -55,6 +55,7 @@ export function OnboardingView({ me, onConnected, onLogout }: Props) {
           </div>
           <button onClick={onLogout} className="text-xs text-ink-500 hover:text-ink-800">Sign out</button>
         </div>
+        <UnofficialNote variant="banner" className="mb-4" />
         <p className="mb-4 text-sm text-ink-600">
           Your password leaves this form only to authenticate against{" "}
           <span className="font-medium text-ink-800">purelymail.com</span> over TLS — for CalDAV (calendar reads/writes),

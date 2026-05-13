@@ -3,6 +3,7 @@
 .env
 .env.*
 !.env.example
+!.env.compose.example
 *.bak
 *.bak2
 *.bak3

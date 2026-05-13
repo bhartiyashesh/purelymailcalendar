@@ -50,6 +50,7 @@ export function LoginView() {
           <img src="/logo.png" alt="" className="h-10 w-10" />
           <h1 className="text-base font-semibold">Purelymail Calendar</h1>
         </div>
+        <UnofficialNote variant="banner" className="mb-4" />
         {sent ? (
           <div>
             <h2 className="mb-1 text-lg font-semibold text-ink-900">Check your email</h2>

@@ -1,0 +1,103 @@
+# Self-host Purelymail Calendar with one command.
+#
+#   docker compose up -d
+#
+# Then open http://localhost:8000 in your browser.
+#
+# This pulls the same container image that runs on purelymailcalendar.com
+# (built by GitHub Actions on every push to `main`, see
+# .github/workflows/deploy.yml). You can also build locally instead -
+# uncomment the `build:` block and comment the `image:` line if you'd
+# rather compile from source on your machine.
+
+services:
+  web:
+    image: ghcr.io/bhartiyashesh/purelymailcalendar:latest
+    # build:
+    #   context: .
+    #   args:
+    #     COMMIT_SHA: local-dev
+    #     BUILD_TIME: ${BUILD_TIME:-local}
+    container_name: pmc-web
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Database: points at the Postgres service below by default.
+      DATABASE_URL: postgresql://pmc:${POSTGRES_PASSWORD:-pmc-local-dev}@db:5432/pmc
+
+      # Generate once with: python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'
+      FERNET_KEY: ${FERNET_KEY:?set FERNET_KEY in .env first}
+
+      # Cookie-signing secret. Any long random string.
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env first}
+
+      # Token used by the cron container below + by the off-repo admin dashboard.
+      CRON_SECRET: ${CRON_SECRET:-${SESSION_SECRET}}
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
+
+      # Resend API key for magic-link sign-in emails. If you leave this empty
+      # the app falls back to the first ACCT_* SMTP account in the legacy CLI
+      # config, which is usually not what self-hosters want - get a free key
+      # at https://resend.com.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-onboarding@resend.dev}
+
+      # Where the app's own links point. Set this to your public URL so
+      # magic-link / confirm-cancel emails contain the right hostname.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
+
+      # CORS origins that may call /api/. Add `null` to allow the off-repo
+      # admin dashboard HTML opened from disk (file://) to work.
+      CALINVITE_WEB_CORS: ${CALINVITE_WEB_CORS:-http://localhost:5173,http://127.0.0.1:5173,null}
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # Postgres. Volume keeps data between `docker compose up` runs.
+  db:
+    image: postgres:16-alpine
+    container_name: pmc-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pmc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pmc-local-dev}
+      POSTGRES_DB: pmc
+    volumes:
+      - pmc-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pmc -d pmc"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # 5-minute cron: fires due email reminders + auto-syncs new inbox invites.
+  # Same role the Railway "cron-reminders" service plays in production.
+  cron:
+    image: curlimages/curl:8.10.1
+    container_name: pmc-cron
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - |
+        while true; do
+          curl -fsS -X POST "http://web:8000/api/reminders/tick" \
+            -H "Authorization: Bearer ${CRON_SECRET:-${SESSION_SECRET}}" \
+            -H "Content-Type: application/json" \
+            -d '{}' || echo "tick failed";
+          sleep 300;
+        done
+
+volumes:
+  pmc-pgdata:

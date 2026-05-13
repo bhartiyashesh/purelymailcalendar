@@ -86,6 +86,27 @@ def health():
     return {"ok": True}
 
 
+@app.get("/api/version")
+def version():
+    """Build provenance for the running container. Baked into the Docker
+    image at build time via --build-arg COMMIT_SHA + BUILD_TIME (CI sets
+    these from github.sha and the workflow timestamp). Public on purpose
+    so anyone can compare the running SHA to the public commit history."""
+    sha = os.getenv("COMMIT_SHA", "unknown")
+    short = sha[:7] if sha and sha != "unknown" else "unknown"
+    return {
+        "commit": sha,
+        "short": short,
+        "built_at": os.getenv("BUILD_TIME", "unknown"),
+        "source": "https://github.com/bhartiyashesh/purelymailcalendar",
+        "commit_url": (
+            f"https://github.com/bhartiyashesh/purelymailcalendar/commit/{sha}"
+            if sha and sha != "unknown"
+            else None
+        ),
+    }
+
+
 @app.get("/api/calendars", response_model=List[CalendarOut])
 def get_calendars(user: User = Depends(current_user)):
     creds = _creds(user)

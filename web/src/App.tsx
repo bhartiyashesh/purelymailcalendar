@@ -10,6 +10,7 @@ import { LoginView } from "./components/LoginView";
 import { VerifyView } from "./components/VerifyView";
 import { OnboardingView } from "./components/OnboardingView";
 import { UnofficialNote } from "./components/UnofficialNote";
+import { RunningSha } from "./components/RunningSha";
 import { ToastStack, type ToastMsg } from "./components/Toast";
 import { addDays, buildMonthGrid, fmtTimeShort, startOfDay, startOfWeek } from "./util";
 import { useReminders } from "./useReminders";
@@ -516,8 +517,9 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
           )}
         </main>
 
-        <footer className="mt-8 border-t border-ink-200 py-6 text-center">
+        <footer className="mt-8 flex flex-col items-center gap-2 border-t border-ink-200 py-6 text-center">
           <UnofficialNote />
+          <RunningSha />
         </footer>
       </div>
 

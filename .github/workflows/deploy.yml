@@ -1,0 +1,85 @@
+name: Build and deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute build metadata
+        id: meta
+        run: |
+          echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          REPO_LC=$(echo "${GITHUB_REPOSITORY,,}")
+          echo "image=ghcr.io/${REPO_LC}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          provenance: false
+          build-args: |
+            COMMIT_SHA=${{ steps.meta.outputs.sha }}
+            BUILD_TIME=${{ steps.meta.outputs.built_at }}
+          tags: |
+            ${{ steps.meta.outputs.image }}:latest
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.short }}
+            ${{ steps.meta.outputs.image }}:sha-${{ steps.meta.outputs.sha }}
+
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        # Skips deploy automatically if no token is set, so forks don't fail.
+        if: ${{ secrets.RAILWAY_TOKEN != '' }}
+        run: |
+          curl -fsSL https://railway.com/install.sh | sh
+          # Pass the same build args so /api/version on the deployed container
+          # matches the commit that triggered this workflow.
+          export COMMIT_SHA=${{ steps.meta.outputs.sha }}
+          export BUILD_TIME=${{ steps.meta.outputs.built_at }}
+          railway up --service web --ci
+
+      - name: Summary
+        run: |
+          {
+            echo "## Build complete"
+            echo ""
+            echo "- Commit: \`${{ steps.meta.outputs.short }}\`"
+            echo "- Built at: ${{ steps.meta.outputs.built_at }}"
+            echo "- Image: \`${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.short }}\`"
+            echo ""
+            echo "Anyone can verify the running build matches this commit:"
+            echo ""
+            echo '\`\`\`'
+            echo "curl https://purelymailcalendar.com/api/version"
+            echo '\`\`\`'
+          } >> "$GITHUB_STEP_SUMMARY"

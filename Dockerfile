@@ -29,6 +29,14 @@ RUN pip install -e ".[web]"
 # Pull in the static frontend bundle.
 COPY --from=web-build /web/dist ./web/dist
 
+# Build provenance baked into the image so /api/version can prove what
+# source the running container was compiled from. CI passes the real
+# values via --build-arg; local docker build falls back to "unknown".
+ARG COMMIT_SHA=unknown
+ARG BUILD_TIME=unknown
+ENV COMMIT_SHA=$COMMIT_SHA \
+    BUILD_TIME=$BUILD_TIME
+
 # Railway sets $PORT; default for local docker runs.
 ENV PORT=8000
 EXPOSE 8000
