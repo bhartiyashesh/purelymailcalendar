@@ -1,0 +1,6 @@
+Contact: mailto:bhartiyashesh@gmail.com
+Contact: https://github.com/bhartiyashesh/purelymailcalendar/issues
+Expires: 2027-12-31T23:59:59.000Z
+Preferred-Languages: en
+Canonical: https://purelymailcalendar.com/.well-known/security.txt
+Policy: https://github.com/bhartiyashesh/purelymailcalendar/blob/main/SECURITY.md

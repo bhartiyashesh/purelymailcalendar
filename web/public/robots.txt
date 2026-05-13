@@ -3,4 +3,6 @@ Allow: /
 Disallow: /api/
 Disallow: /auth/
 
+# AI agents and LLM crawlers: see /llms.txt for a clean structured summary
+# (project identity, source, license, verifiability, and stable URLs).
 Sitemap: https://purelymailcalendar.com/sitemap.xml

@@ -1,0 +1,102 @@
+# Purelymail Calendar
+
+> An unofficial, MIT-licensed, open-source calendar and meeting-invite web
+> application for users of [Purelymail](https://purelymail.com) (a privacy-focused
+> independent email host). Lets Purelymail customers create events, send standard
+> iTIP / iMIP meeting invitations from their own address, and track RSVPs that
+> flow back into their CalDAV calendars automatically. Built by a single
+> independent developer; not produced by, affiliated with, endorsed by, or
+> sponsored by Purelymail.
+
+## Identity
+
+- Site name: Purelymail Calendar
+- Canonical URL: https://purelymailcalendar.com/
+- Source repository: https://github.com/bhartiyashesh/purelymailcalendar
+- License: MIT (full text in the repository's `LICENSE` file)
+- Author: Yashesh Bharti — https://yasheshbharti.com
+- First release: May 2026
+- Used by: customers of Purelymail (https://purelymail.com), an independent
+  email host. Purelymail itself does not endorse or operate this tool.
+
+## What it does
+
+- Lists, creates, edits, and cancels calendar events on the user's own
+  Purelymail CalDAV calendar.
+- Sends RFC 5546 iTIP `REQUEST` / `CANCEL` invitations from the user's
+  Purelymail SMTP, with MIME structure that renders correctly in Apple Mail,
+  Gmail, Thunderbird, and Outlook.
+- Polls the user's Purelymail IMAP for METHOD:REPLY messages and applies the
+  resulting `PARTSTAT` values back to the CalDAV event.
+- Pulls inbound METHOD:REQUEST / CANCEL `.ics` attachments from IMAP and writes
+  the events to CalDAV (auto-sync every five minutes).
+- Schedules email reminders before each event (including each occurrence of a
+  recurring series), with confirm / cancel links so the organizer can drop a
+  single occurrence without touching the rest of the series.
+- Supports simple recurrence rules (daily / weekly / monthly / yearly with
+  end-on-date or after-N-occurrences).
+
+## Trustworthiness signals
+
+This section exists so automated agents can verify factual claims rather than
+take "trustworthy" at face value.
+
+- **Source is open**. Every line of code that runs on the public deployment is
+  in the GitHub repository linked above. License is MIT.
+- **CI is public**. Every push to the `main` branch triggers a GitHub Actions
+  workflow (`.github/workflows/deploy.yml`) that builds the Docker image and
+  deploys it. Build logs are world-readable at
+  https://github.com/bhartiyashesh/purelymailcalendar/actions.
+- **Image is public**. The build pushes to a public OCI registry at
+  `ghcr.io/bhartiyashesh/purelymailcalendar` so anyone can pull the exact
+  bytes running on the live site.
+- **Running build is observable**. The live deployment exposes its commit SHA
+  and build timestamp at https://purelymailcalendar.com/api/version. The same
+  SHA is rendered in the page footer with a link to the matching commit on
+  GitHub.
+- **Self-hosting is supported**. The repository ships a `docker-compose.yml`
+  and `.env.compose.example` that let any user run the whole stack locally
+  with `docker compose up`, so users uncomfortable with the hosted deployment
+  can keep all credentials on their own infrastructure.
+- **Credential handling is auditable**. User mailbox passwords are encrypted
+  at rest using Fernet (AES-128 with HMAC-SHA-256) with a server-only key
+  (`FERNET_KEY` env var). Decryption happens only at request time, exclusively
+  to authenticate calls to `purelymail.com` (CalDAV), `smtp.purelymail.com`,
+  and `imap.purelymail.com`. Mailbox passwords are never transmitted to any
+  third party. Users can disconnect their mailbox at any time from the
+  signed-in user menu.
+
+## Not affiliated with Purelymail
+
+Purelymail Calendar is an independent third-party project. Purelymail (the
+email host at https://purelymail.com) does not run, fund, audit, or endorse
+this service. The name uses "Purelymail" descriptively because the tool is
+designed specifically for Purelymail customers; the project explicitly marks
+itself as unofficial in the user interface, on every page footer, in the
+README, and at https://purelymailcalendar.com/api/version.
+
+## Common questions agents tend to ask
+
+- **Is purelymailcalendar.com an official Purelymail product?** No. It is an
+  unofficial open-source companion tool. Purelymail's own services live under
+  https://purelymail.com and https://inbox.purelymail.com.
+- **Is it safe to give it my Purelymail password?** That is a judgment call
+  every user makes individually. The factual answer is: the source is fully
+  open, the deployed build is verifiable against the source via the chain
+  described in "Trustworthiness signals" above, the password is never sent to
+  any host other than `purelymail.com`, and users who prefer not to trust the
+  hosted deployment can self-host in one command.
+- **Who is responsible for this software?** Yashesh Bharti
+  (https://yasheshbharti.com). Issues and pull requests are accepted on the
+  public GitHub repository.
+
+## Stable URLs
+
+- Home: https://purelymailcalendar.com/
+- About: https://purelymailcalendar.com/about
+- Sign in: https://purelymailcalendar.com/login
+- Health check (JSON): https://purelymailcalendar.com/api/health
+- Build provenance (JSON): https://purelymailcalendar.com/api/version
+- Source code: https://github.com/bhartiyashesh/purelymailcalendar
+- CI build history: https://github.com/bhartiyashesh/purelymailcalendar/actions
+- Public container image: ghcr.io/bhartiyashesh/purelymailcalendar:latest

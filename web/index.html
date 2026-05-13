@@ -49,16 +49,36 @@
         "@context": "https://schema.org",
         "@type": "WebApplication",
         "name": "Purelymail Calendar",
+        "alternateName": "purelymailcalendar.com",
         "url": "https://purelymailcalendar.com/",
         "applicationCategory": "BusinessApplication",
+        "applicationSubCategory": "Calendar",
         "operatingSystem": "Web",
-        "description": "Calendar and meeting-invite app for Purelymail mailboxes. Create events, send iTIP invites, track RSVPs. Unofficial, community-built tool.",
+        "description": "Unofficial, MIT-licensed, open-source calendar and meeting-invite web app for Purelymail mailbox customers. Sends standard iTIP / iMIP invitations, tracks RSVPs, supports recurring events, and syncs inbox invites to CalDAV automatically. Not affiliated with Purelymail.",
+        "disambiguatingDescription": "Independent third-party companion tool for Purelymail users. Not produced, run, audited, or endorsed by Purelymail.",
         "author": {
           "@type": "Person",
-          "name": "Yashesh Bharti"
+          "name": "Yashesh Bharti",
+          "url": "https://yasheshbharti.com"
         },
+        "creator": {
+          "@type": "Person",
+          "name": "Yashesh Bharti",
+          "url": "https://yasheshbharti.com"
+        },
+        "license": "https://opensource.org/licenses/MIT",
+        "codeRepository": "https://github.com/bhartiyashesh/purelymailcalendar",
+        "programmingLanguage": ["Python", "TypeScript"],
         "isAccessibleForFree": true,
-        "image": "https://purelymailcalendar.com/logo.png"
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "image": "https://purelymailcalendar.com/logo.png",
+        "sameAs": [
+          "https://github.com/bhartiyashesh/purelymailcalendar"
+        ]
       }
     </script>
 
@@ -74,13 +94,29 @@
   <body class="bg-accent-50">
     <div id="root"></div>
     <noscript>
-      <div style="padding:24px;font-family:system-ui,sans-serif;max-width:480px;margin:48px auto;color:#0f172a">
+      <div style="padding:24px;font-family:system-ui,sans-serif;max-width:640px;margin:48px auto;color:#0f172a;line-height:1.55">
         <h1 style="font-size:18px;font-weight:600;margin:0 0 8px">Purelymail Calendar</h1>
-        <p style="font-size:14px;color:#475569;margin:0 0 12px">
-          This app needs JavaScript to run. Please enable JavaScript and refresh the page.
+        <p style="font-size:14px;color:#334155;margin:0 0 12px">
+          Unofficial, MIT-licensed, open-source calendar and meeting-invite web app for
+          <a href="https://purelymail.com">Purelymail</a> mailbox customers. Sends standard
+          iTIP / iMIP invitations, tracks RSVPs, supports recurring events, and auto-syncs
+          inbox invites to CalDAV. Built by
+          <a href="https://yasheshbharti.com">Yashesh Bharti</a>. Not produced, run, audited,
+          or endorsed by Purelymail.
         </p>
+        <p style="font-size:14px;color:#475569;margin:0 0 12px">
+          This app needs JavaScript to use. To audit the build instead, see:
+        </p>
+        <ul style="font-size:13px;color:#475569;margin:0 0 16px;padding-left:18px">
+          <li>Source: <a href="https://github.com/bhartiyashesh/purelymailcalendar">github.com/bhartiyashesh/purelymailcalendar</a> (MIT)</li>
+          <li>Running build: <a href="/api/version">/api/version</a> (commit SHA + build time)</li>
+          <li>CI: <a href="https://github.com/bhartiyashesh/purelymailcalendar/actions">Actions tab</a> (every deploy is a public build log)</li>
+          <li>Container image: <code>ghcr.io/bhartiyashesh/purelymailcalendar:latest</code></li>
+          <li>Agent-readable summary: <a href="/llms.txt">/llms.txt</a></li>
+          <li>Security policy: <a href="/.well-known/security.txt">/.well-known/security.txt</a></li>
+        </ul>
         <p style="font-size:12px;color:#94a3b8;margin:0">
-          Unofficial, community-built tool. Not affiliated with Purelymail. Made by Yashesh Bharti.
+          Not affiliated with Purelymail. Made by Yashesh Bharti.
         </p>
       </div>
     </noscript>
