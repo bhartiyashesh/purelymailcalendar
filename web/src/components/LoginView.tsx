@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api";
+import { TrustLine } from "./TrustLine";
 import { UnofficialNote } from "./UnofficialNote";
 
 const STORED_EMAIL_KEY = "pmc.lastSignInEmail";
@@ -46,11 +47,13 @@ export function LoginView() {
   return (
     <div className="flex min-h-full flex-col items-center justify-center bg-accent-50 px-4 py-12">
       <div className="card w-full max-w-md p-6">
-        <div className="mb-4 flex items-center gap-2">
-          <img src="/logo.png" alt="" className="h-10 w-10" />
-          <h1 className="text-base font-semibold">Purelymail Calendar</h1>
+        <div className="mb-4">
+          <div className="flex items-center gap-2">
+            <img src="/logo.png" alt="" className="h-10 w-10" />
+            <h1 className="text-base font-semibold">Purelymail Calendar</h1>
+          </div>
+          <TrustLine className="mt-1 pl-12" />
         </div>
-        <UnofficialNote variant="banner" className="mb-4" />
         {sent ? (
           <div>
             <h2 className="mb-1 text-lg font-semibold text-ink-900">Check your email</h2>

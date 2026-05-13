@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { api } from "../api";
 import type { Me } from "../types";
+import { TrustLine } from "./TrustLine";
 import { UnofficialNote } from "./UnofficialNote";
 
 type Props = {
@@ -49,13 +50,15 @@ export function OnboardingView({ me, onConnected, onLogout }: Props) {
     <div className="flex min-h-full flex-col items-center bg-accent-50 px-4 py-12">
       <div className="card w-full max-w-lg p-6">
         <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="" className="h-8 w-8" />
-            <h1 className="text-base font-semibold">Connect your Purelymail mailbox</h1>
+          <div>
+            <div className="flex items-center gap-2">
+              <img src="/logo.png" alt="" className="h-8 w-8" />
+              <h1 className="text-base font-semibold">Connect your Purelymail mailbox</h1>
+            </div>
+            <TrustLine className="mt-1 pl-10" />
           </div>
           <button onClick={onLogout} className="text-xs text-ink-500 hover:text-ink-800">Sign out</button>
         </div>
-        <UnofficialNote variant="banner" className="mb-4" />
         <p className="mb-4 text-sm text-ink-600">
           Your password leaves this form only to authenticate against{" "}
           <span className="font-medium text-ink-800">purelymail.com</span> over TLS — for CalDAV (calendar reads/writes),
