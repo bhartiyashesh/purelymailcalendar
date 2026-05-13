@@ -66,7 +66,10 @@ jobs:
             echo "Add it under Settings → Secrets and variables → Actions to enable auto-deploy."
             exit 0
           fi
-          curl -fsSL https://railway.com/install.sh | sh
+          # Railway's install.sh uses bash-only syntax internally; piping to
+          # `sh` (dash on Ubuntu runners) fails with "Bad substitution".
+          curl -fsSL https://railway.com/install.sh | bash
+          export PATH="$HOME/.railway/bin:$PATH"
           # Push COMMIT_SHA + BUILD_TIME to the Railway service env so the
           # running container reports the right values at /api/version,
           # regardless of whether Railway rebuilds the image or pulls from GHCR.
