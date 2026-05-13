@@ -138,11 +138,35 @@ if body :contains "METHOD:REPLY" {
 
 Hosted on Railway. The `Dockerfile` does a multi-stage build (Node builds the frontend, Python serves both the API and the static bundle). `railway.json` declares the build + healthcheck.
 
+Pushes to `main` are built and deployed automatically by [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): the workflow builds the image with the commit SHA baked in via `--build-arg`, pushes three tags (`latest`, short SHA, full SHA) to `ghcr.io/bhartiyashesh/purelymailcalendar`, and runs `railway up`. Manual fallback:
+
 ```bash
 railway up --service web
 ```
 
 Health: `GET /api/health` returns `200 {"ok":true}`.
+
+## Verifying what's running
+
+The point of this section is to make "trust me bro" unnecessary.
+
+1. Open <https://purelymailcalendar.com/api/version>. The response includes the git SHA, build timestamp, and a direct link to the matching commit on GitHub.
+2. Open the [Actions tab](https://github.com/bhartiyashesh/purelymailcalendar/actions). Every deploy is a public build log tied to a commit.
+3. The same image is pushed to the public registry:
+   ```bash
+   docker pull ghcr.io/bhartiyashesh/purelymailcalendar:latest
+   docker image inspect ghcr.io/bhartiyashesh/purelymailcalendar:latest --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}'
+   ```
+4. Compare the SHA shown in the footer of any signed-in page (or returned by `/api/version`) against the public commit history.
+5. Don't trust the deploy at all? Self-host:
+   ```bash
+   git clone https://github.com/bhartiyashesh/purelymailcalendar.git
+   cd purelymailcalendar
+   cp .env.compose.example .env  # fill in FERNET_KEY, SESSION_SECRET, RESEND_API_KEY
+   docker compose up -d
+   ```
+
+The verification chain is: **public commit → public Actions build log → public image digest → `/api/version` on the running site → SHA badge in the footer**.
 
 ## iTIP correctness notes
 
