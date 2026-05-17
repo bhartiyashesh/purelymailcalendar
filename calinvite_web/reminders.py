@@ -25,7 +25,7 @@ from email.utils import formataddr
 from typing import List, Optional
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Query
 from fastapi.responses import HTMLResponse
 
 from .crypto import decrypt
@@ -331,8 +331,26 @@ def tick_due(limit: int = 50) -> dict:
     return {"sent": sent, "failed": failed, "skipped": skipped}
 
 
+def _run_invite_autosync_safely() -> None:
+    """Wrapper so a stray exception in the background thread doesn't crash."""
+    try:
+        from . import services  # local import to avoid import-time cycle
+        result = services.auto_sync_all_users_invites()
+        print(f"[tick/bg] invite auto-sync done: {result}")
+    except Exception as e:
+        print(f"[tick/bg] invite auto-sync failed: {e}")
+
+
 @router.post("/tick")
-def tick_endpoint(authorization: Optional[str] = Header(default=None)):
+def tick_endpoint(
+    background_tasks: BackgroundTasks,
+    authorization: Optional[str] = Header(default=None),
+):
+    """Fire due email reminders synchronously (fast) and kick off the
+    per-user invite auto-sync in a background task so the HTTP response
+    returns immediately. Iterating IMAP+CalDAV serially across every
+    mailbox was overrunning Railway's request timeout once the user
+    count grew past a handful."""
     secret = os.getenv("CRON_SECRET")
     if not secret:
         raise HTTPException(status_code=503, detail="CRON_SECRET not configured")
@@ -340,16 +358,11 @@ def tick_endpoint(authorization: Optional[str] = Header(default=None)):
     if authorization != expected:
         raise HTTPException(status_code=401, detail="unauthorized")
     reminders = tick_due()
-    # Piggyback: every reminder tick also auto-syncs inbox invites for all
-    # users so newly-arrived invitations show up on the calendar without
-    # any user action. Failure here doesn't roll back the reminder sends.
-    try:
-        from . import services  # local import to avoid import-time cycle
-        invites = services.auto_sync_all_users_invites()
-    except Exception as e:
-        print(f"[tick] invite auto-sync failed: {e}")
-        invites = {"users_synced": 0, "users_failed": 0, "totals": {}}
-    return {"reminders": reminders, "invites": invites}
+    background_tasks.add_task(_run_invite_autosync_safely)
+    return {
+        "reminders": reminders,
+        "invites": {"status": "queued"},
+    }
 
 
 # ---- Confirmation pages -----------------------------------------------------
