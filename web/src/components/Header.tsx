@@ -27,20 +27,30 @@ export function Header({ me, calendars, calendar, setCalendar, eventCounts = {},
 
   const initials = (me.display_name || me.email).slice(0, 2).toUpperCase();
 
+  const todayLabel = new Intl.DateTimeFormat(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date());
+
   return (
-    <header className="sticky top-0 z-30 border-b border-ink-200 bg-white/80 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-accent-900/20 bg-accent-50/80 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <img src="/logo.png" alt="" className="h-8 w-8" />
-          <span className="text-sm font-semibold tracking-tight">Purelymail Calendar</span>
+          <span className="font-serif text-lg text-accent-900">Purelymail Calendar</span>
         </div>
+        <span className="hidden font-serif text-xs italic text-accent-900/70 md:inline">
+          {todayLabel}
+        </span>
         <div className="flex-1" />
         <div className="flex items-center gap-3">
           <a
             href="https://inbox.purelymail.com/"
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden text-sm font-medium uppercase tracking-wide text-accent-700 hover:text-accent-900 sm:inline-block"
+            className="hidden font-serif text-xs uppercase tracking-[0.2em] text-accent-900/70 hover:text-accent-900 sm:inline-block"
           >
             Webmail
           </a>

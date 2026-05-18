@@ -473,7 +473,7 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
 
       <div className="mx-auto max-w-6xl px-4">
         <QuietLoader active={eventsLoading} />
-        <nav className="mt-4 flex gap-1 border-b border-ink-200">
+        <nav className="mt-4 flex gap-1 border-b border-accent-900/20">
           <TabButton active={tab === "calendar"} onClick={() => setTab("calendar")}>Calendar</TabButton>
           <TabButton active={tab === "events"} onClick={() => setTab("events")}>Events</TabButton>
           <TabButton active={tab === "rsvps"} onClick={() => setTab("rsvps")}>RSVPs</TabButton>
@@ -517,9 +517,18 @@ function AuthedApp({ me, onSignOut, onAuthLost }: { me: Me; onSignOut: () => voi
           )}
         </main>
 
-        <footer className="mt-8 flex flex-col items-center gap-2 border-t border-ink-200 py-6 text-center">
-          <UnofficialNote />
-          <RunningSha />
+        <footer className="mt-12 border-t border-accent-900/20 pt-6 pb-10">
+          <p className="font-serif text-sm italic leading-relaxed text-ink-700">
+            <span className="not-italic text-accent-900">Colophon.</span> Purelymail
+            Calendar is set in Newsreader and the system sans, served from a single
+            Python container on Railway, with calendar storage on Purelymail's
+            CalDAV. Source on GitHub. Reproducible via the public image at
+            ghcr.io/bhartiyashesh/purelymailcalendar.
+          </p>
+          <div className="mt-4 flex flex-col items-start gap-2">
+            <UnofficialNote />
+            <RunningSha />
+          </div>
         </footer>
       </div>
 
@@ -692,8 +701,10 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
   return (
     <button
       onClick={onClick}
-      className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
-        active ? "border-accent-600 text-ink-900" : "border-transparent text-ink-500 hover:text-ink-800"
+      className={`-mb-px border-b px-3 py-2 font-serif text-xs uppercase tracking-[0.25em] transition-colors ${
+        active
+          ? "border-accent-900 text-accent-900"
+          : "border-transparent text-accent-900/55 hover:text-accent-900"
       }`}
     >
       {children}

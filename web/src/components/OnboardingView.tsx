@@ -47,33 +47,48 @@ export function OnboardingView({ me, onConnected, onLogout }: Props) {
   }
 
   return (
-    <div className="flex min-h-full flex-col items-center bg-accent-50 px-4 py-12">
-      <div className="card w-full max-w-lg p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <img src="/logo.png" alt="" className="h-8 w-8" />
-              <h1 className="text-base font-semibold">Connect your Purelymail mailbox</h1>
-            </div>
-            <TrustLine className="mt-1 pl-10" />
+    <div className="flex min-h-full flex-col items-center bg-accent-50 px-6 py-16 sm:py-24">
+      <div className="w-full max-w-xl">
+        <div className="flex items-baseline justify-between border-b border-accent-900/30 pb-3">
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="" className="h-8 w-8" />
+            <span className="font-serif text-xl text-accent-900">Purelymail Calendar</span>
           </div>
-          <button onClick={onLogout} className="text-xs text-ink-500 hover:text-ink-800">Sign out</button>
-        </div>
-        <p className="mb-4 text-sm text-ink-600">
-          Your password leaves this form only to authenticate against{" "}
-          <span className="font-medium text-ink-800">purelymail.com</span> over TLS — for CalDAV (calendar reads/writes),
-          SMTP (sending invites from your address), and IMAP (reading RSVPs and inbound invites). It is encrypted at
-          rest with a server-only key, never logged, never shared with anyone but Purelymail, and the source is{" "}
-          <a
-            href="https://github.com/bhartiyashesh/purelymailcalendar"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-medium text-accent-700 underline-offset-2 hover:text-accent-900 hover:underline"
+          <button
+            onClick={onLogout}
+            className="font-serif text-xs uppercase tracking-[0.2em] text-accent-900/70 hover:text-accent-900"
           >
-            open for you to inspect
-          </a>
-          .
-        </p>
+            Sign out
+          </button>
+        </div>
+
+        <section className="pt-10 sm:pt-14">
+          <p className="font-serif text-xs uppercase tracking-[0.25em] text-accent-700">
+            Volume i &middot; Setup
+          </p>
+          <h1 className="mt-3 font-serif text-4xl leading-tight text-accent-900 sm:text-5xl">
+            Connect your <span className="italic">Purelymail</span> mailbox.
+          </h1>
+          <p className="mt-5 max-w-prose font-serif text-lg italic text-ink-700">
+            Your password leaves this form only to authenticate against{" "}
+            <span className="not-italic text-accent-900">purelymail.com</span> over TLS,
+            for CalDAV (calendar reads and writes), SMTP (sending invites from your
+            address), and IMAP (reading RSVPs and inbound invites). Encrypted at rest
+            with a server-only key, never logged, never shared with anyone but
+            Purelymail.{" "}
+            <a
+              href="https://github.com/bhartiyashesh/purelymailcalendar"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="not-italic font-medium text-accent-700 underline-offset-2 hover:text-accent-900 hover:underline"
+            >
+              Source is open
+            </a>
+            .
+          </p>
+        </section>
+
+        <div className="mt-10 max-w-md">
         <form onSubmit={submit} className="grid gap-3">
           <div>
             <label className="label">Purelymail email</label>
@@ -166,9 +181,14 @@ export function OnboardingView({ me, onConnected, onLogout }: Props) {
             {busy ? "Connecting..." : "Connect mailbox"}
           </button>
         </form>
-      </div>
-      <div className="mt-6 max-w-lg text-center">
-        <UnofficialNote />
+        </div>
+
+        <div className="mt-16 border-t border-accent-900/20 pt-6">
+          <TrustLine />
+        </div>
+        <div className="mt-6">
+          <UnofficialNote />
+        </div>
       </div>
     </div>
   );

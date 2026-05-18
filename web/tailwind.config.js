@@ -15,6 +15,17 @@ export default {
           "sans-serif",
         ],
         mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+        // Editorial display serif. Used for headlines, datelines, and the
+        // wordmark; body type stays sans.
+        serif: [
+          "Newsreader",
+          "ui-serif",
+          "Georgia",
+          "Cambria",
+          "Times New Roman",
+          "Times",
+          "serif",
+        ],
       },
       colors: {
         ink: {
