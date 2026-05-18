@@ -274,6 +274,7 @@ if _static_dir.is_dir():
         return FileResponse(_static_dir / "index.html")
 
     @app.get("/about")
+    @app.get("/about/")
     def about_page():
         about_html = _static_dir / "about.html"
         if about_html.is_file():
@@ -282,7 +283,17 @@ if _static_dir.is_dir():
 
     @app.get("/{full_path:path}")
     def spa_fallback(full_path: str):
+        # Normalize so /foo/ still resolves to /foo.html / dist/foo.html
+        # before falling through to the SPA shell. Without this, a stray
+        # trailing slash on a static URL like /about/ returns index.html
+        # and looks like the page failed to load.
+        candidate = full_path.rstrip("/")
         target = _static_dir / full_path
         if target.is_file():
             return FileResponse(target)
+        if candidate and candidate != full_path:
+            for ext in ("", ".html"):
+                alt = _static_dir / (candidate + ext)
+                if alt.is_file():
+                    return FileResponse(alt)
         return FileResponse(_static_dir / "index.html")
