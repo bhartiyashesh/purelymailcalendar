@@ -62,10 +62,16 @@ export function LoginView() {
           aria-hidden="true"
         />
         <div className="relative flex h-full flex-col justify-between p-10">
-          <a href="/" className="flex items-center gap-3">
-            <img src="/logo.png" alt="" className="h-9 w-9" />
-            <span className="font-serif text-xl text-white drop-shadow-sm">
-              Purelymail Calendar
+          <a href="/" className="flex items-start gap-3">
+            <img src="/logo.png" alt="" className="mt-0.5 h-9 w-9" />
+            <span className="flex flex-col leading-tight">
+              <span className="font-serif text-xl text-white drop-shadow-sm">
+                Purelymail Calendar
+              </span>
+              <span className="mt-0.5 text-[11px] uppercase tracking-[0.18em] text-white/85 drop-shadow-sm">
+                <span className="font-semibold">Unofficial</span>
+                <span className="opacity-70"> &middot; not associated with Purelymail</span>
+              </span>
             </span>
           </a>
           <div className="max-w-md text-white">
