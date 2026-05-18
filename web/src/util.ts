@@ -36,7 +36,7 @@ export function partstatStyle(p: string): string {
   if (s === "ACCEPTED") return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200";
   if (s === "DECLINED") return "bg-red-50 text-red-700 ring-1 ring-red-200";
   if (s === "TENTATIVE") return "bg-amber-50 text-amber-700 ring-1 ring-amber-200";
-  if (s === "DELEGATED") return "bg-violet-50 text-violet-700 ring-1 ring-violet-200";
+  if (s === "DELEGATED") return "bg-sky-50 text-sky-700 ring-1 ring-sky-200";
   return "bg-ink-100 text-ink-600 ring-1 ring-ink-200";
 }
 
