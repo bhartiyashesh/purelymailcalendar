@@ -267,13 +267,25 @@ export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes,
       <div className="absolute inset-0 bg-ink-900/30" onClick={onClose} />
       <form
         onSubmit={submit}
-        className="absolute right-0 top-0 flex h-full w-full max-w-xl flex-col bg-white shadow-xl"
+        className="absolute right-0 top-0 flex h-full w-full max-w-xl flex-col bg-accent-50 shadow-xl"
       >
-        <div className="flex items-center justify-between border-b border-ink-200 px-5 py-3">
-          <h2 className="text-base font-semibold">
-            {mode === "edit" ? "Edit event" : "New event"}
-          </h2>
-          <button type="button" onClick={onClose} className="text-ink-500 hover:text-ink-800" aria-label="close">×</button>
+        <div className="flex items-baseline justify-between border-b border-accent-900/30 px-6 py-5">
+          <div>
+            <p className="font-serif text-[11px] uppercase tracking-[0.25em] text-accent-700">
+              {mode === "edit" ? "Volume i · Revision" : "Volume i · Filing"}
+            </p>
+            <h2 className="mt-1 font-serif text-2xl text-accent-900">
+              {mode === "edit" ? "Edit event" : "New event"}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="font-serif text-2xl leading-none text-accent-900/60 hover:text-accent-900"
+            aria-label="close"
+          >
+            ×
+          </button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <div className="grid gap-4">
@@ -623,7 +635,7 @@ export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes,
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2 border-t border-ink-200 px-5 py-3">
+        <div className="flex items-center gap-2 border-t border-accent-900/30 bg-accent-50 px-6 py-4">
           {mode === "edit" && initial && onCancelEvent && (
             <button
               type="button"
