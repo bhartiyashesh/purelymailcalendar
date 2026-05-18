@@ -29,18 +29,36 @@ export default {
           800: "#1e293b",
           900: "#0f172a",
         },
+        // Warm coral palette. Anchors set by the brand colors:
+        //   50  = body cream         (#FFF3E3)
+        //   200 = inactive surfaces  (#FFD8B8)
+        //   500 = tabs / rings       (#FF6B5A)
+        //   600 = header / primary   (#E94B35)
+        //   900 = outline / shadow   (#7A1F14)
         accent: {
-          50: "#f5f3ff",
-          100: "#ede9fe",
-          200: "#ddd6fe",
-          300: "#c4b5fd",
-          400: "#a78bfa",
-          500: "#8b5cf6",
-          600: "#7c3aed",
-          700: "#6d28d9",
-          800: "#5b21b6",
-          900: "#4c1d95",
+          50: "#fff3e3",
+          100: "#ffe9d2",
+          200: "#ffd8b8",
+          300: "#ffc197",
+          400: "#ff9c7a",
+          500: "#ff6b5a",
+          600: "#e94b35",
+          700: "#c03b28",
+          800: "#9a2b1c",
+          900: "#7a1f14",
         },
+        // Single-value highlight for "today" / "selected date" cells. Read
+        // as a hotter accent than the brand coral, used sparingly.
+        flame: "#ff7a1a",
+      },
+      // "Plain 400" type. The Tailwind weight classes still render across
+      // the codebase, but each tier is shifted down one notch so the
+      // overall page reads as quiet body type, not display.
+      fontWeight: {
+        normal: "400",
+        medium: "400",
+        semibold: "500",
+        bold: "500",
       },
       keyframes: {
         "loader-slide": {

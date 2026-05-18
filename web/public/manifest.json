@@ -4,8 +4,8 @@
   "description": "Calendar and invite app for Purelymail mailboxes. Unofficial, community-built.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f8fafc",
-  "theme_color": "#4f46e5",
+  "background_color": "#fff3e3",
+  "theme_color": "#e94b35",
   "icons": [
     {
       "src": "/logo.png",

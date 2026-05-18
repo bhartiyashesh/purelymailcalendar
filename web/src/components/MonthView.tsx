@@ -140,7 +140,7 @@ export function MonthView({ anchorDate, events, onCreateAt, onEdit, onMove }: Pr
                   className={[
                     "text-xs font-medium",
                     isToday
-                      ? "flex h-5 w-5 items-center justify-center rounded-full bg-accent-600 text-white"
+                      ? "flex h-5 w-5 items-center justify-center rounded-full bg-flame text-white"
                       : inMonth
                       ? "text-ink-700"
                       : "text-ink-400",

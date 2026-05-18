@@ -273,7 +273,7 @@ export function WeekView({ anchorDate, events, onCreateAt, onEdit, onMove, daysC
               <div
                 className={
                   isToday
-                    ? "mx-auto mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-accent-600 text-xs font-semibold text-white"
+                    ? "mx-auto mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-flame text-xs font-semibold text-white"
                     : "text-sm font-medium text-ink-800"
                 }
               >
