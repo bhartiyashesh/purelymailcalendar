@@ -45,24 +45,65 @@ export function LoginView() {
   }
 
   return (
-    <div className="flex min-h-full flex-col bg-accent-50">
-      <header className="border-b border-accent-900/20">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+    <div className="grid min-h-full grid-cols-1 bg-accent-50 lg:grid-cols-2">
+      {/* Left rail: hero image. Hidden on small screens so the form gets
+          the whole viewport on mobile. */}
+      <aside className="relative hidden overflow-hidden lg:block">
+        <img
+          src="/signin-hero.jpg"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        {/* Subtle coral wash + bottom gradient so the wordmark stays readable
+            no matter how the photo crops. */}
+        <div className="absolute inset-0 bg-accent-900/10" aria-hidden="true" />
+        <div
+          className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-accent-900/60 to-transparent"
+          aria-hidden="true"
+        />
+        <div className="relative flex h-full flex-col justify-between p-10">
           <a href="/" className="flex items-center gap-3">
-            <img src="/logo.png" alt="" className="h-8 w-8" />
-            <span className="font-serif text-lg text-accent-900">Purelymail Calendar</span>
+            <img src="/logo.png" alt="" className="h-9 w-9" />
+            <span className="font-serif text-xl text-white drop-shadow-sm">
+              Purelymail Calendar
+            </span>
           </a>
-          <a
-            href="/about"
-            className="font-serif text-xs uppercase tracking-[0.2em] text-accent-900/70 hover:text-accent-900"
-          >
-            About
-          </a>
+          <div className="max-w-md text-white">
+            <p className="font-serif text-[11px] uppercase tracking-[0.25em] text-white/80">
+              Volume i &middot; Sign in
+            </p>
+            <p className="mt-3 font-serif text-3xl italic leading-tight drop-shadow">
+              A calendar for the <span className="not-italic">Purelymail</span> mailbox.
+            </p>
+            <p className="mt-3 max-w-sm text-sm text-white/85">
+              Send real meeting invites, track RSVPs, sync inbound invitations.
+              Events live on Purelymail's CalDAV, where they already were.
+            </p>
+          </div>
         </div>
-      </header>
+      </aside>
 
-      <main className="flex flex-1 items-center justify-center px-6 py-12">
-        <div className="w-full max-w-sm">
+      {/* Right rail: the actual sign-in form. */}
+      <main className="flex flex-col">
+        <header className="border-b border-accent-900/20 lg:border-none">
+          <div className="flex items-center justify-between px-6 py-4">
+            <a href="/" className="flex items-center gap-3 lg:invisible">
+              <img src="/logo.png" alt="" className="h-8 w-8" />
+              <span className="font-serif text-lg text-accent-900">
+                Purelymail Calendar
+              </span>
+            </a>
+            <a
+              href="/about"
+              className="font-serif text-xs uppercase tracking-[0.2em] text-accent-900/70 hover:text-accent-900"
+            >
+              About
+            </a>
+          </div>
+        </header>
+
+        <div className="flex flex-1 items-center justify-center px-6 py-12">
+          <div className="w-full max-w-sm">
           {sent ? (
             <section className="text-center">
               <h1 className="font-serif text-3xl text-accent-900">Check your email.</h1>
@@ -154,6 +195,7 @@ export function LoginView() {
           </div>
           <div className="mt-3">
             <UnofficialNote />
+          </div>
           </div>
         </div>
       </main>
