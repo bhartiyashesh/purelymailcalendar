@@ -91,6 +91,7 @@ export type EventOut = {
   reminders?: ReminderOut[];
   organizer?: OrganizerOut | null;
   attendees: AttendeeOut[];
+  bcc_invites?: boolean;
   recurrence?: RecurrenceOut | null;
   occurrence_id?: string;
   master_uid?: string;
@@ -114,6 +115,7 @@ export type EventIn = {
   location?: string;
   description?: string;
   attendees: AttendeeIn[];
+  bcc_invites?: boolean;
   reminders?: ReminderIn[];
   recurrence?: RecurrenceIn | null;
   dry_run?: boolean;
@@ -124,12 +126,14 @@ export type EventIn = {
 export type CreateEventResponse = {
   uid: string;
   sent_to: string[];
+  failed_to?: string[];
   dry_run: boolean;
 };
 
 export type CancelEventResponse = {
   uid: string;
   sent_to: string[];
+  failed_to?: string[];
 };
 
 export type RsvpResultOut = {

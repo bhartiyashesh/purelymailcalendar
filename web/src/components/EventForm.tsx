@@ -154,6 +154,7 @@ export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes,
   const [location, setLocation] = useState(initial?.location || "");
   const [description, setDescription] = useState(initial?.description || "");
   const [attendees, setAttendees] = useState<AttRow[]>(attendeesFrom(initial));
+  const [bccInvites, setBccInvites] = useState(!!initial?.bcc_invites);
   const [reminders, setReminders] = useState<ReminderRow[]>(
     initial ? [] : [{ popup: true, email: false, allAttendees: true, amount: 15, unit: "minutes", recipients: "" }]
   );
@@ -230,6 +231,7 @@ export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes,
       attendees: attendees
         .map((r) => ({ email: r.email.trim(), name: r.name.trim() || undefined }))
         .filter((r) => !!r.email),
+      bcc_invites: bccInvites,
       reminders: reminders.flatMap<ReminderIn>((r) => {
         const out: ReminderIn[] = [];
         const minutes_before = toMinutes(r);
@@ -448,6 +450,18 @@ export function EventForm({ mode, initial, prefillStart, prefillDurationMinutes,
                   />
                 ))}
               </div>
+              <label className="mt-3 inline-flex items-center gap-2 text-sm text-ink-700">
+                <input
+                  type="checkbox"
+                  checked={bccInvites}
+                  onChange={(e) => setBccInvites(e.target.checked)}
+                  className="h-4 w-4 rounded border-ink-300 text-accent-600 focus:ring-accent-500"
+                />
+                BCC invites
+              </label>
+              <p className="mt-1 text-xs text-ink-500">
+                Each person gets their own invite and will not see the other attendees' email addresses.
+              </p>
             </div>
             <div>
               <div className="mb-2 flex items-center justify-between">

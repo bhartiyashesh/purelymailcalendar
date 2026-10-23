@@ -15,13 +15,15 @@ from __future__ import annotations
 
 import smtplib
 import ssl
+from contextlib import contextmanager
 from email import encoders
 from email.charset import QP, Charset
+from email.message import Message
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr, formatdate, make_msgid
-from typing import Iterable
+from typing import Iterable, Iterator, Sequence
 
 
 _QP_UTF8 = Charset("utf-8")
@@ -71,6 +73,60 @@ def build_message(
     return msg
 
 
+@contextmanager
+def _smtp_client(
+    smtp_host: str,
+    smtp_port: int,
+    smtp_user: str,
+    smtp_pass: str,
+) -> Iterator[smtplib.SMTP]:
+    """One logged-in SMTP session. Callers send every message through it."""
+    ctx = ssl.create_default_context()
+    if smtp_port == 465:
+        client: smtplib.SMTP = smtplib.SMTP_SSL(smtp_host, smtp_port, context=ctx)
+    else:
+        client = smtplib.SMTP(smtp_host, smtp_port)
+        client.ehlo()
+        client.starttls(context=ctx)
+        client.ehlo()
+    try:
+        client.login(smtp_user, smtp_pass)
+        yield client
+    finally:
+        try:
+            client.quit()
+        except Exception:
+            try:
+                client.close()
+            except Exception:
+                pass
+
+
+def send_all(
+    *,
+    smtp_host: str,
+    smtp_port: int,
+    smtp_user: str,
+    smtp_pass: str,
+    deliveries: Sequence[tuple[Message, Iterable[str]]],
+) -> list[tuple[str, BaseException]]:
+    """Send each message on a single SMTP session.
+
+    Returns `(recipient, error)` for deliveries that failed. A failure for
+    one recipient does not stop the rest.
+    """
+    failed: list[tuple[str, BaseException]] = []
+    with _smtp_client(smtp_host, smtp_port, smtp_user, smtp_pass) as client:
+        for msg, recipients in deliveries:
+            addrs = list(recipients)
+            try:
+                client.send_message(msg, from_addr=smtp_user, to_addrs=addrs)
+            except Exception as e:
+                for addr in addrs:
+                    failed.append((addr, e))
+    return failed
+
+
 def send(
     *,
     smtp_host: str,
@@ -80,15 +136,12 @@ def send(
     msg: MIMEMultipart,
     to_addrs: Iterable[str],
 ) -> None:
-    ctx = ssl.create_default_context()
-    if smtp_port == 465:
-        with smtplib.SMTP_SSL(smtp_host, smtp_port, context=ctx) as s:
-            s.login(smtp_user, smtp_pass)
-            s.send_message(msg, from_addr=smtp_user, to_addrs=list(to_addrs))
-    else:
-        with smtplib.SMTP(smtp_host, smtp_port) as s:
-            s.ehlo()
-            s.starttls(context=ctx)
-            s.ehlo()
-            s.login(smtp_user, smtp_pass)
-            s.send_message(msg, from_addr=smtp_user, to_addrs=list(to_addrs))
+    failed = send_all(
+        smtp_host=smtp_host,
+        smtp_port=smtp_port,
+        smtp_user=smtp_user,
+        smtp_pass=smtp_pass,
+        deliveries=[(msg, to_addrs)],
+    )
+    if failed:
+        raise failed[0][1]

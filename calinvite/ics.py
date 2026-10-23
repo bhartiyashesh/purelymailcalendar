@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
-from typing import Iterable, List, Optional, Tuple
+from typing import Iterable, List, Optional, Sequence, Tuple
 from zoneinfo import ZoneInfo
 
 from icalendar import Alarm as ICalAlarm, Calendar, Event, Timezone, TimezoneStandard, TimezoneDaylight, vCalAddress, vText, vRecur
@@ -64,6 +64,9 @@ class EventSpec:
     # EXDATEs (cancelled occurrences) — preserved when re-PUTting an existing
     # series so previously cancelled instances stay cancelled.
     exdates: List[datetime] = field(default_factory=list)
+    # When set, outbound iTIP copies are trimmed to one guest. The organizer's
+    # stored VEVENT still lists everyone; this property records the choice.
+    bcc_invites: bool = False
 
 
 def _vtimezone(tz_name: str) -> Timezone:
@@ -92,6 +95,63 @@ def _build_calendar(method: str, prodid: str) -> Calendar:
     cal.add("calscale", "GREGORIAN")
     cal.add("method", method)
     return cal
+
+
+def _apply_bcc_flag(event: Event, spec: EventSpec) -> None:
+    if spec.bcc_invites:
+        event.add("X-CALINVITE-BCC", "TRUE")
+
+
+def _mailto_email(value) -> str:
+    s = str(value).strip()
+    if s.lower().startswith("mailto:"):
+        s = s[7:]
+    return s.strip()
+
+
+def _as_list(raw) -> list:
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return list(raw)
+    return [raw]
+
+
+def _replace_attendees(component, kept: Sequence) -> None:
+    while "attendee" in component:
+        del component["attendee"]
+    for item in kept:
+        component.add("attendee", item, encode=0)
+
+
+def ics_for_recipient(ics_bytes: bytes, recipient_email: str, organizer_email: str) -> bytes:
+    """Copy an iTIP payload so the guest cannot see the rest of the guest list.
+
+    VEVENT ATTENDEE rows are limited to the organizer and this recipient.
+    EMAIL VALARMs keep only this recipient. An EMAIL alarm with nobody left
+    is removed, because RFC 5545 requires an ATTENDEE on those alarms.
+    DISPLAY alarms are left alone. RECURRENCE-ID and the rest of the event
+    stay put.
+    """
+    cal = Calendar.from_ical(ics_bytes)
+    keep = {recipient_email.lower().strip(), organizer_email.lower().strip()}
+    guest = recipient_email.lower().strip()
+    for comp in cal.walk("VEVENT"):
+        kept = [a for a in _as_list(comp.get("attendee")) if _mailto_email(a).lower() in keep]
+        _replace_attendees(comp, kept)
+        for alarm in list(comp.subcomponents):
+            if getattr(alarm, "name", None) != "VALARM":
+                continue
+            if str(alarm.get("action") or "").upper() != "EMAIL":
+                continue
+            alarm_kept = [
+                a for a in _as_list(alarm.get("attendee")) if _mailto_email(a).lower() == guest
+            ]
+            if not alarm_kept:
+                comp.subcomponents.remove(alarm)
+            else:
+                _replace_attendees(alarm, alarm_kept)
+    return cal.to_ical()
 
 
 def _add_attendees(event: Event, attendees: Iterable[Attendee]) -> None:
@@ -144,6 +204,7 @@ def _make_event(spec: EventSpec, status: str = "CONFIRMED") -> Tuple[Calendar, E
     org = vCalAddress(f"mailto:{spec.organizer_email}")
     org.params["CN"] = vText(spec.organizer_name)
     ev["organizer"] = org
+    _apply_bcc_flag(ev, spec)
 
     _add_attendees(ev, spec.attendees)
 
@@ -189,6 +250,7 @@ def build_cancel(spec: EventSpec) -> Tuple[bytes, str]:
     org = vCalAddress(f"mailto:{spec.organizer_email}")
     org.params["CN"] = vText(spec.organizer_name)
     ev["organizer"] = org
+    _apply_bcc_flag(ev, spec)
     _add_attendees(ev, spec.attendees)
 
     cal.add_component(ev)

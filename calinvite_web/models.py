@@ -127,6 +127,10 @@ class ScheduledReminder(Base):
     fire_at: Mapped[datetime] = mapped_column(DateTime(), index=True, nullable=False)
     minutes_before: Mapped[int] = mapped_column(Integer, nullable=False)
     recipients_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    # When set, the reminder is emailed once per recipient so the guest list
+    # is not in a shared To header. Confirm/cancel links stay on the
+    # organizer's copy only.
+    bcc_invites: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(), nullable=True)
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

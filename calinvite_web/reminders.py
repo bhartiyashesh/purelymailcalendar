@@ -17,8 +17,6 @@ from __future__ import annotations
 import json
 import os
 import secrets
-import smtplib
-import ssl
 from datetime import date, datetime, timedelta
 from email.message import EmailMessage
 from email.utils import formataddr
@@ -27,6 +25,8 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Query
 from fastapi.responses import HTMLResponse
+
+from calinvite import mailer
 
 from .crypto import decrypt
 from .db import SessionLocal
@@ -197,6 +197,7 @@ def replace_for_event(
                     recipients_json=json.dumps(recipients),
                     description=(a.description or "")[:5000],
                     confirm_token=_new_token(),
+                    bcc_invites=bool(inp.bcc_invites),
                 ))
                 written += 1
         db.commit()
@@ -249,10 +250,26 @@ def _format_when(occ_start: datetime) -> str:
     return occ_start.strftime("%a %b %d, %Y  %I:%M %p UTC")
 
 
-def _send_one(mailbox: Mailbox, r: ScheduledReminder) -> None:
-    recipients: List[str] = json.loads(r.recipients_json or "[]")
-    if not recipients:
-        raise RuntimeError("no recipients")
+def _unique_emails(addresses: List[str]) -> List[str]:
+    seen: set[str] = set()
+    out: List[str] = []
+    for raw in addresses:
+        email = (raw or "").strip()
+        key = email.lower()
+        if not email or key in seen:
+            continue
+        seen.add(key)
+        out.append(email)
+    return out
+
+
+def _reminder_message(
+    mailbox: Mailbox,
+    r: ScheduledReminder,
+    recipients: List[str],
+    *,
+    include_actions: bool,
+) -> EmailMessage:
     occ = r.occurrence_start or r.event_start
     when_str = _format_when(occ)
     offset = (
@@ -262,6 +279,7 @@ def _send_one(mailbox: Mailbox, r: ScheduledReminder) -> None:
     base = _public_base_url()
     confirm_link = f"{base}/api/reminders/confirm/{r.confirm_token}?action=yes" if r.confirm_token else None
     cancel_link = f"{base}/api/reminders/confirm/{r.confirm_token}?action=cancel" if r.confirm_token else None
+    show_actions = include_actions and confirm_link and cancel_link
 
     subject = f"Reminder: {r.event_summary}"
     body_text_lines = [
@@ -271,7 +289,7 @@ def _send_one(mailbox: Mailbox, r: ScheduledReminder) -> None:
     ]
     if r.description:
         body_text_lines += ["", r.description]
-    if confirm_link and cancel_link:
+    if show_actions:
         body_text_lines += [
             "",
             "Will this happen?",
@@ -282,7 +300,7 @@ def _send_one(mailbox: Mailbox, r: ScheduledReminder) -> None:
     body_text = "\n".join(body_text_lines)
 
     confirm_html = ""
-    if confirm_link and cancel_link:
+    if show_actions:
         confirm_html = (
             "<p style='margin-top:18px;font-weight:600;color:#1e293b'>Will this happen?</p>"
             f"<p><a href='{confirm_link}' style='display:inline-block;padding:8px 14px;background:#16a34a;color:#fff;text-decoration:none;border-radius:6px;margin-right:8px'>Yes, confirm</a>"
@@ -302,18 +320,46 @@ def _send_one(mailbox: Mailbox, r: ScheduledReminder) -> None:
     msg["To"] = ", ".join(recipients)
     msg.set_content(body_text)
     msg.add_alternative(body_html, subtype="html")
+    return msg
 
-    password = decrypt(mailbox.encrypted_password)
-    ctx = ssl.create_default_context()
-    if mailbox.smtp_port == 465:
-        with smtplib.SMTP_SSL(mailbox.smtp_host, mailbox.smtp_port, context=ctx) as s:
-            s.login(mailbox.email, password)
-            s.send_message(msg)
+
+def _send_one(mailbox: Mailbox, r: ScheduledReminder) -> None:
+    recipients = _unique_emails(json.loads(r.recipients_json or "[]"))
+    if not recipients:
+        raise RuntimeError("no recipients")
+    organizer = mailbox.email.lower().strip()
+    if r.bcc_invites:
+        # One message per person, on one SMTP session. Confirm/cancel links
+        # can drop the occurrence for everyone, so only the organizer gets them.
+        deliveries = [
+            (
+                _reminder_message(
+                    mailbox,
+                    r,
+                    [email],
+                    include_actions=email.lower() == organizer,
+                ),
+                [email],
+            )
+            for email in recipients
+        ]
+        if organizer not in {email.lower() for email in recipients}:
+            deliveries.append(
+                (_reminder_message(mailbox, r, [mailbox.email], include_actions=True), [mailbox.email])
+            )
     else:
-        with smtplib.SMTP(mailbox.smtp_host, mailbox.smtp_port) as s:
-            s.ehlo(); s.starttls(context=ctx); s.ehlo()
-            s.login(mailbox.email, password)
-            s.send_message(msg)
+        deliveries = [(_reminder_message(mailbox, r, recipients, include_actions=True), recipients)]
+
+    failed = mailer.send_all(
+        smtp_host=mailbox.smtp_host,
+        smtp_port=mailbox.smtp_port,
+        smtp_user=mailbox.email,
+        smtp_pass=decrypt(mailbox.encrypted_password),
+        deliveries=deliveries,
+    )
+    if failed:
+        missed = ", ".join(addr for addr, _ in failed)
+        raise RuntimeError(f"reminder failed for {missed}") from failed[0][1]
 
 
 def tick_due(limit: int = 50) -> dict:

@@ -85,6 +85,9 @@ class EventIn(BaseModel):
     attendees: List[AttendeeIn] = []
     reminders: List[ReminderIn] = []
     recurrence: Optional[RecurrenceIn] = None
+    # When true, each guest is emailed their own invite and the .ics they
+    # receive lists only themselves. The organizer's calendar still has everyone.
+    bcc_invites: bool = False
     dry_run: bool = False
     uid: Optional[str] = None
     sequence: Optional[int] = None
@@ -102,6 +105,7 @@ class EventOut(BaseModel):
     reminders: List[ReminderOut] = []
     organizer: Optional[OrganizerOut] = None
     attendees: List[AttendeeOut] = []
+    bcc_invites: bool = False
     # Recurrence: present on every occurrence returned for a recurring master.
     recurrence: Optional[RecurrenceOut] = None
     # Stable id per visible occurrence. For a one-off event this equals `uid`.
@@ -116,12 +120,15 @@ class EventOut(BaseModel):
 class CreateEventResponse(BaseModel):
     uid: str
     sent_to: List[str]
+    # Guests whose invite could not be delivered. The event is still saved.
+    failed_to: List[str] = []
     dry_run: bool
 
 
 class CancelEventResponse(BaseModel):
     uid: str
     sent_to: List[str]
+    failed_to: List[str] = []
 
 
 class RsvpResultOut(BaseModel):

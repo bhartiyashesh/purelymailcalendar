@@ -72,6 +72,7 @@ def _startup() -> None:
         ("scheduled_reminders", "confirmed_at", "TIMESTAMP"),
         ("scheduled_reminders", "declined_at", "TIMESTAMP"),
         ("scheduled_reminders", "mailbox_id", "INTEGER"),
+        ("scheduled_reminders", "bcc_invites", "BOOLEAN NOT NULL DEFAULT FALSE"),
         ("mailboxes", "selected_calendar", "VARCHAR(255)"),
         ("mailboxes", "color", "VARCHAR(16)"),
         ("mailboxes", "last_scanned_at", "TIMESTAMP"),
@@ -352,7 +353,7 @@ def cancel_event(uid: str, body: EventIn, user: User = Depends(current_user), ma
     creds = _creds(mailbox)
     try:
         result = services.cancel_event(creds, uid, body, user_id=user.id, mailbox_id=mailbox.id)
-        return CancelEventResponse(uid=result.uid, sent_to=result.sent_to)
+        return CancelEventResponse(uid=result.uid, sent_to=result.sent_to, failed_to=result.failed_to)
     except (RuntimeError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
